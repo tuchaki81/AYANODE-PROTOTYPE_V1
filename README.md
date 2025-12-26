@@ -1,27 +1,27 @@
-# AYANODE // PROTOTYPE_V1
+An interactive visualization of a **resonant node** architecture inspired by concepts of complex networks, spin networks (loop quantum gravity), and emergent dynamics in distributed AI systems.
 
-Uma visualização interativa de uma arquitetura de **nodo ressonante** inspirada em conceitos de redes complexas, spin networks (gravidade quântica em loop) e dinâmicas emergentes em sistemas de IA distribuída.
+The prototype simulates in real time three main metrics of a hypothetical node:
+- **Internal Coherence (I)**: degree of alignment of internal states.
+- **Local Potential (U)**: processing capacity or "energy" available.
+- **Stress (T)**: external interference or network stress.
 
-O protótipo simula em tempo real três métricas principais de um nodo hipotético:
-- **Coerência Interna (I)**: grau de alinhamento dos estados internos.
-- **Potencial Local (U)**: capacidade de processamento ou "energia" disponível.
-- **Tensão (T)**: interferências externas ou estresse da rede.
+These metrics directly influence the visual geometry: particles orbit a central nucleus, react to the 16-dimensional spin vector, and tremble as the stress increases.
 
-Essas métricas influenciam diretamente a geometria visual: partículas orbitam um núcleo central, reagem ao vetor de spin de 16 dimensões e tremem conforme a tensão aumenta.
+More than generative art, AYANODE serves as an **exploratory prototype** for:
+- Intuitive visualization of node health and state in distributed systems (edge ​​computing, federated learning, blockchain).
+- Monitoring metrics in AI model ensembles.
 
-Mais que arte generativa, o AYANODE serve como **protótipo exploratório** para:
-- Visualização intuitiva de saúde e estado de nodos em sistemas distribuídos (edge computing, federated learning, blockchain).
-- Monitoramento de métricas em ensembles de modelos de IA.
-- Exploração conceitual de arquiteturas neuromórficas e ressonância em computação emergente.
-- Ferramenta educativa sobre emergência, coerência e resiliência em redes complexas.
+- Conceptual exploration of neuromorphic architectures and resonance in emergent computing.
 
-## Demo ao vivo
+- Educational tool on emergence, coherence, and resilience in complex networks.
+
+## Live Demo
 
 https://dreamy-faun-2b7914.netlify.app/
 
-### Versão HTML / p5.js (original - 2D)
-Abra diretamente no navegador:  
+### HTML Version / p5.js (original - 2D)
+Open directly in your browser:
 [AYANODE_v1.html](AYANODE_v1.html)
 
-Basta baixar o arquivo ou clicar para executar — não precisa de servidor.
+Simply download the file or click to run — no server required.
 
