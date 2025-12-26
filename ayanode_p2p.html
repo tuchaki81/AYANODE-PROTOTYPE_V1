@@ -77,42 +77,67 @@ ws.onmessage = async (event) => {
 };
 
 async function createPeerConnection(peerId, polite) {
-    const pc = new RTCPeerConnection({iceServers: [{urls: 'stun:stun.l.google.com:19302'}]});
-    peers.set(peerId, {pc, channel: null, polite});
+    const pc = new RTCPeerConnection({
+        iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            // TURN servers gratuitos do OpenRelay (excelentes para mobile e redes restritivas)
+            {
+                urls: 'turn:openrelay.metered.ca:80',
+                username: 'openrelayproject',
+                credential: 'openrelayproject'
+            },
+            {
+                urls: 'turn:openrelay.metered.ca:443',
+                username: 'openrelayproject',
+                credential: 'openrelayproject'
+            },
+            {
+                urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+                username: 'openrelayproject',
+                credential: 'openrelayproject'
+            }
+        ]
+    });
+
+    peers.set(peerId, { pc, channel: null, polite });
 
     pc.onicecandidate = (e) => {
         if (e.candidate) {
-            ws.send(JSON.stringify({type: 'ice', to: peerId, candidate: e.candidate}));
+            ws.send(JSON.stringify({ type: 'ice', to: peerId, candidate: e.candidate }));
         }
     };
 
     pc.onconnectionstatechange = () => {
         updatePeerCount();
+        // Debug opcional: console.log(`Conexão com ${peerId}: ${pc.connectionState}`);
     };
 
     const channel = pc.createDataChannel('ayanode');
     channel.onopen = () => {
         peers.get(peerId).channel = channel;
-        channel.send(JSON.stringify({type: 'state', state: getState()}));
+        channel.send(JSON.stringify({ type: 'state', state: getState() }));
         document.getElementById('status').innerText = `Ressonância ativa com ${peers.size} nodos`;
     };
 
     channel.onmessage = (e) => {
-        const data = JSON.parse(e.data);
-        if (data.type === 'state') {
-            applyResonance(data.state);
+        try {
+            const data = JSON.parse(e.data);
+            if (data.type === 'state') {
+                applyResonance(data.state);
+            }
+        } catch (err) {
+            console.error('Erro ao parsear mensagem do peer:', err);
         }
     };
 
     if (polite) {
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
-        ws.send(JSON.stringify({type: 'offer', to: peerId, offer}));
+        ws.send(JSON.stringify({ type: 'offer', to: peerId, offer }));
     }
 
     return pc;
 }
-
 function getState() {
     return {
         spin: [...node.spin],
