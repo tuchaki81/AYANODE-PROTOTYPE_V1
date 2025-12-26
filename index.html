@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AYANODE // COLLECTIVE CONSCIOUSNESS V1</title>
+    <title>AYANODE // COLLECTIVE CONSCIOUSNESS V1.1</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
     <style>
@@ -19,7 +19,7 @@
 <body>
     <div id="ui">
         <h1>AYANODE // SYST. CÉREBRO COLETIVO</h1>
-        <div class="metric">DOMÍNIO: <span class="val">REDE NEURAL P2P</span></div>
+        <div class="metric">DOMÍNIO: <span class="val">ONTOLOGIA INFORMACIONAL</span></div>
         <div class="metric">NODOS ATIVOS: <span id="peers" class="val">0</span></div>
         <div class="metric">COERÊNCIA (I): <span id="icoer" class="val">0.0000</span></div>
         <div class="metric">POTENCIAL (U): <span id="u_pot" class="val">0.0000</span></div>
@@ -30,30 +30,74 @@
 
 <script>
 // ====================== CONFIGURAÇÃO DE MEMÓRIA (GUN) ======================
-// Usando relays públicos para garantir que os dados persistam mesmo sem nós ativos
-const gun = Gun([
-    'https://gun-manhattan.herokuapp.com/gun',
-    'https://relay.peer.ooo/gun'
-]);
+const gun = Gun(['https://gun-manhattan.herokuapp.com/gun', 'https://relay.peer.ooo/gun']);
 const collectiveBrain = gun.get('ayanode_prototype_v1_collective_memory');
 
-// ====================== LÓGICA DO NODO ======================
+// ====================== DEFINIÇÃO DO NODO ======================
 let node = {
     spin: Array.from({length: 16}, () => Math.random() * 2 - 1),
-    icoer: 0.5,
-    u_local: 0.5,
-    tension: 0.01,
+    icoer: 0.0,
+    u_local: 0.0,
+    tension: 0.0,
     isRecovered: false
 };
 
-// Tenta recuperar a última "lembrança" da rede ao iniciar
-collectiveBrain.get('last_stable_state').once((data) => {
-    if (data && data.spin) {
-        node.spin = JSON.parse(data.spin);
-        node.isRecovered = true;
-        document.getElementById('memory-status').innerText = "Memória: Estado histórico recuperado.";
+// ====================== MOTOR ONTOLÓGICO (TEORIA DO SPIN) ======================
+const D = 12;      // Dimensões holográficas
+const ALPHA = 1.0; // Peso da Coerência
+const GAMMA = 0.1; // Peso da Tensão
+
+function calcularAcaoU(localSpin, remoteSpins) {
+    if (remoteSpins.length === 0) return 0.5; 
+
+    // Referência: média dos spins na vizinhança (Eq. 4.2)
+    let ref = localSpin.map((val, idx) => {
+        let sum = val + remoteSpins.reduce((a, b) => a + b[idx], 0);
+        return sum / (remoteSpins.length + 1);
+    });
+    
+    // Coerência (I) - Eq. 4.1
+    let icoer = remoteSpins.reduce((acc, remote) => {
+        let dot = localSpin.reduce((a, b, i) => a + b * remote[i], 0);
+        let dist = 0.5 * (1.0 - dot); // Métrica de Sobreposição
+        return acc + Math.pow(1.0 - dist, D);
+    }, 0) / remoteSpins.length;
+
+    // Tensão (T) - Eq. 6.2
+    let currentTension = localSpin.reduce((acc, val, i) => acc + Math.pow(Math.abs(val - ref[i]), D), 0);
+    let t_norm = Math.log(1 + currentTension) / (1 + Math.log(1 + currentTension));
+
+    node.icoer = icoer;
+    node.tension = t_norm;
+
+    // Ação Unificada (U) - Eq. 7.8
+    return (ALPHA * icoer) - (GAMMA * t_norm);
+}
+
+function evoluirNodo() {
+    let remoteStates = Array.from(peers.values())
+        .filter(p => p.pc && p.pc.connectionState === 'connected' && p.state)
+        .map(p => p.state.spin);
+
+    if (remoteStates.length === 0) return;
+
+    let originalSpin = [...node.spin];
+    let originalU = calcularAcaoU(originalSpin, remoteStates);
+    
+    // Gradiente Ascendente: Pequenas mutações para maximizar U
+    for (let i = 0; i < 16; i++) {
+        node.spin[i] += (Math.random() - 0.5) * 0.1; 
+        let newU = calcularAcaoU(node.spin, remoteStates);
+        
+        if (newU < originalU) {
+            node.spin[i] = originalSpin[i]; 
+        } else {
+            originalU = newU;
+        }
     }
-});
+    node.spin = normalize(node.spin);
+    node.u_local = originalU;
+}
 
 function normalize(v) {
     let norm = Math.sqrt(v.reduce((a, b) => a + b*b, 0)) + 1e-12;
@@ -88,11 +132,8 @@ ws.onmessage = async (event) => {
 };
 
 async function createPeerConnection(peerId, polite) {
-    const pc = new RTCPeerConnection({
-        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
-    });
-
-    peers.set(peerId, { pc, channel: null, polite });
+    const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+    peers.set(peerId, { pc, channel: null, polite, state: null });
 
     pc.onicecandidate = (e) => {
         if (e.candidate) ws.send(JSON.stringify({ type: 'ice', to: peerId, candidate: e.candidate }));
@@ -107,7 +148,10 @@ async function createPeerConnection(peerId, polite) {
         };
         channel.onmessage = (e) => {
             const data = JSON.parse(e.data);
-            if (data.type === 'state') applyResonance(data.state);
+            if (data.type === 'state') {
+                peers.get(peerId).state = data.state;
+                applyResonance(data.state);
+            }
         };
     };
 
@@ -127,26 +171,26 @@ function getState() {
 }
 
 function applyResonance(remoteState) {
-    const coupling = 0.2; 
+    // A ressonância agora é integrada via evoluirNodo, mas mantemos o acoplamento rápido
+    const coupling = 0.05; 
     for (let i = 0; i < 16; i++) {
         node.spin[i] += coupling * (remoteState.spin[i] - node.spin[i]);
     }
     node.spin = normalize(node.spin);
     
-    // Se a coerência estiver alta, "gravamos" este pensamento na memória coletiva (Gun)
-    if (node.icoer > 0.92) {
+    if (node.icoer > 0.95) {
         collectiveBrain.get('last_stable_state').put({
             spin: JSON.stringify(node.spin),
             timestamp: Date.now()
         });
-        document.getElementById('memory-status').innerText = "Memória: Consolidando consciência...";
+        document.getElementById('memory-status').innerText = "Memória: Consolidando consciência coletiva...";
     }
 }
 
 function updatePeerCount() {
     peerCount = Array.from(peers.values()).filter(p => p.pc.connectionState === 'connected').length;
     document.getElementById('peers').innerText = peerCount;
-    document.getElementById('status').innerText = peerCount > 0 ? "Ressonância Coletiva Ativa" : "Aguardando outros neurônios...";
+    document.getElementById('status').innerText = peerCount > 0 ? "Ressonância Ativa" : "Aguardando outros neurônios...";
 }
 
 // ====================== VISUALIZAÇÃO P5 ======================
@@ -155,21 +199,21 @@ function setup() {
 }
 
 function draw() {
-    background(10, 10, 12, 40);
+    background(10, 10, 12, 45);
 
-    // Evolução temporal do spin
-    const lam = 0.03;
-    const noise = 0.015;
-    for (let i = 0; i < 16; i++) {
-        node.spin[i] = (1 - lam) * node.spin[i] + (Math.random() - 0.5) * noise;
+    if (peerCount > 0) {
+        evoluirNodo(); // Busca ativa por Ação Unificada
+    } else {
+        // Ruído térmico do substrato quando isolado
+        for (let i = 0; i < 16; i++) {
+            node.spin[i] += (Math.random() - 0.5) * 0.02;
+        }
+        node.spin = normalize(node.spin);
+        node.u_local = 0.1; 
+        node.tension = 0.05;
     }
-    node.spin = normalize(node.spin);
 
-    node.icoer = 0.85 + Math.random() * 0.1;
-    node.tension = Math.abs(Math.sin(frameCount * 0.02)) * 0.04;
-    node.u_local = (node.icoer * 0.8) + (peerCount * 0.05);
-
-    if (frameCount % 20 === 0 && peerCount > 0) {
+    if (frameCount % 30 === 0 && peerCount > 0) {
         peers.forEach(p => {
             if (p.channel?.readyState === 'open') p.channel.send(JSON.stringify({type: 'state', state: getState()}));
         });
@@ -180,37 +224,38 @@ function draw() {
     document.getElementById('u_pot').innerText = node.u_local.toFixed(4);
     document.getElementById('tens').innerText = node.tension.toFixed(4);
 
-    // Desenho do Cérebro (Anel Ressonante)
+    // Renderização do Vórtice Informacional
+    
     translate(width/2, height/2);
-    const particles = 80;
-    const baseRadius = 160 + (node.u_local * 80);
+    const particles = 120;
+    const baseRadius = 150 + (node.u_local * 100);
 
     for (let i = 0; i < particles; i++) {
         const angle = TWO_PI / particles * i;
         const sVal = node.spin[i % 16];
         
-        let x = cos(angle) * (baseRadius + sVal * 60);
-        let y = sin(angle) * (baseRadius + sVal * 60);
+        let x = cos(angle) * (baseRadius + sVal * 70);
+        let y = sin(angle) * (baseRadius + sVal * 70);
 
-        // Efeito de tensão (vibração)
-        x += random(-node.tension * 200, node.tension * 200);
-        y += random(-node.tension * 200, node.tension * 200);
+        // A tensão distorce o substrato espacialmente
+        x += random(-node.tension * 150, node.tension * 150);
+        y += random(-node.tension * 150, node.tension * 150);
 
         stroke(0, 255, 204, 180);
-        strokeWeight(2 + node.u_local * 2);
+        strokeWeight(1.5 + node.icoer * 3);
         point(x, y);
 
-        if (i % 5 === 0) {
-            stroke(0, 255, 204, 40);
+        if (i % 6 === 0) {
+            stroke(0, 255, 204, 30);
             line(0, 0, x, y);
         }
     }
 
-    // Núcleo
+    // Núcleo (Singularidade Informacional)
     noFill();
-    stroke(255, 0, 255, 100); // Cor da memória (Magenta)
+    stroke(255, 0, 255, 150); 
     strokeWeight(1);
-    ellipse(0, 0, baseRadius * 0.4 + sin(frameCount * 0.05) * 10);
+    ellipse(0, 0, baseRadius * 0.3 + sin(frameCount * 0.05) * 15);
 }
 
 function windowResized() { resizeCanvas(windowWidth, windowHeight); }
