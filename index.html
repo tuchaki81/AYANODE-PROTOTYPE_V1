@@ -3,251 +3,217 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AYANODE // P2P RESONANCE</title>
+    <title>AYANODE // COLLECTIVE CONSCIOUSNESS V1</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
     <style>
         body { margin: 0; background: #0a0a0c; color: #fff; font-family: 'Courier New', monospace; overflow: hidden; }
-        #ui { position: absolute; top: 20px; left: 20px; z-index: 10; padding: 15px; background: rgba(0,0,0,0.5); border-radius: 8px; border: 1px solid #00ffcc44; }
-        .metric { margin-bottom: 10px; font-size: 15px; letter-spacing: 1.5px; }
+        #ui { position: absolute; top: 20px; left: 20px; z-index: 10; padding: 15px; background: rgba(0,0,0,0.7); border-radius: 8px; border: 1px solid #00ffcc44; box-shadow: 0 0 20px rgba(0,255,204,0.1); }
+        .metric { margin-bottom: 10px; font-size: 14px; letter-spacing: 1.5px; }
         .val { font-weight: bold; color: #00ffcc; text-shadow: 0 0 10px #00ffcc; }
-        h1 { font-size: 20px; margin-bottom: 20px; opacity: 0.9; text-shadow: 0 0 15px #00ffcc; }
-        #status { font-size: 14px; color: #00ffaa; margin-top: 10px; }
+        h1 { font-size: 18px; margin-bottom: 20px; opacity: 0.9; text-shadow: 0 0 15px #00ffcc; border-bottom: 1px solid #00ffcc33; padding-bottom: 10px; }
+        #status { font-size: 12px; color: #00ffaa; margin-top: 10px; font-style: italic; }
+        #memory-status { font-size: 11px; color: #ff00ff; margin-top: 5px; opacity: 0.8; }
     </style>
 </head>
 <body>
     <div id="ui">
-        <h1>AYANODE // P2P RESONANCE</h1>
-        <div class="metric">DOMÍNIO: <span class="val">REDE P2P</span></div>
-        <div class="metric">NODOS CONECTADOS: <span id="peers" class="val">0</span></div>
+        <h1>AYANODE // SYST. CÉREBRO COLETIVO</h1>
+        <div class="metric">DOMÍNIO: <span class="val">REDE NEURAL P2P</span></div>
+        <div class="metric">NODOS ATIVOS: <span id="peers" class="val">0</span></div>
         <div class="metric">COERÊNCIA (I): <span id="icoer" class="val">0.0000</span></div>
         <div class="metric">POTENCIAL (U): <span id="u_pot" class="val">0.0000</span></div>
         <div class="metric">TENSÃO (T): <span id="tens" class="val">0.0000</span></div>
-        <div id="status">Conectando à rede ressonante...</div>
+        <div id="status">Iniciando sinapses...</div>
+        <div id="memory-status">Memória: Sincronizando com o passado...</div>
     </div>
 
 <script>
-// ====================== LÓGICA AYANODE ======================
+// ====================== CONFIGURAÇÃO DE MEMÓRIA (GUN) ======================
+// Usando relays públicos para garantir que os dados persistam mesmo sem nós ativos
+const gun = Gun([
+    'https://gun-manhattan.herokuapp.com/gun',
+    'https://relay.peer.ooo/gun'
+]);
+const collectiveBrain = gun.get('ayanode_prototype_v1_collective_memory');
+
+// ====================== LÓGICA DO NODO ======================
 let node = {
     spin: Array.from({length: 16}, () => Math.random() * 2 - 1),
-    icoer: 0.9,
+    icoer: 0.5,
     u_local: 0.5,
-    tension: 0.01
+    tension: 0.01,
+    isRecovered: false
 };
+
+// Tenta recuperar a última "lembrança" da rede ao iniciar
+collectiveBrain.get('last_stable_state').once((data) => {
+    if (data && data.spin) {
+        node.spin = JSON.parse(data.spin);
+        node.isRecovered = true;
+        document.getElementById('memory-status').innerText = "Memória: Estado histórico recuperado.";
+    }
+});
 
 function normalize(v) {
     let norm = Math.sqrt(v.reduce((a, b) => a + b*b, 0)) + 1e-12;
     return v.map(x => x / norm);
 }
 
-// ====================== WEBRTC P2P ======================
-const SIGNALING_SERVER = 'wss://ayanode-p2p-signaling.onrender.com'; // ← TROQUE AQUI
-let peers = new Map(); // peerId → {pc, channel}
+// ====================== WEBRTC P2P & SINALIZAÇÃO ======================
+const SIGNALING_SERVER = 'wss://ayanode-p2p-signaling.onrender.com';
+let peers = new Map();
 let myId = Math.random().toString(36).substring(2, 9);
 let peerCount = 0;
 
-document.getElementById('status').innerText = `ID: ${myId} | Conectando...`;
-
 const ws = new WebSocket(SIGNALING_SERVER);
-
-ws.onopen = () => {
-    document.getElementById('status').innerText = `Online | Aguardando nodos...`;
-};
 
 ws.onmessage = async (event) => {
     const msg = JSON.parse(event.data);
-    if (msg.type === 'id') {
-        myId = msg.id;
-    } else if (msg.type === 'offer' && !peers.has(msg.from)) {
+    if (msg.type === 'id') myId = msg.id;
+    else if (msg.type === 'offer') {
         await createPeerConnection(msg.from, false);
         await peers.get(msg.from).pc.setRemoteDescription(msg.offer);
         const answer = await peers.get(msg.from).pc.createAnswer();
         await peers.get(msg.from).pc.setLocalDescription(answer);
         ws.send(JSON.stringify({type: 'answer', to: msg.from, answer}));
-    } else if (msg.type === 'answer' && peers.has(msg.from)) {
-        await peers.get(msg.from).pc.setRemoteDescription(msg.answer);
-    } else if (msg.type === 'ice' && peers.has(msg.from)) {
-        await peers.get(msg.from).pc.addIceCandidate(msg.candidate);
-    } else if (msg.type === 'list') {
+    } 
+    else if (msg.type === 'answer') await peers.get(msg.from).pc.setRemoteDescription(msg.answer);
+    else if (msg.type === 'ice') await peers.get(msg.from).pc.addIceCandidate(msg.candidate);
+    else if (msg.type === 'list') {
         for (const peerId of msg.peers) {
-            if (peerId !== myId && !peers.has(peerId)) {
-                await createPeerConnection(peerId, true);
-            }
+            if (peerId !== myId && !peers.has(peerId)) await createPeerConnection(peerId, true);
         }
     }
 };
 
 async function createPeerConnection(peerId, polite) {
     const pc = new RTCPeerConnection({
-        iceServers: [
-            { urls: 'stun:stun.l.google.com:19302' },
-            // TURN servers gratuitos do OpenRelay (excelentes para mobile e redes restritivas)
-            {
-                urls: 'turn:openrelay.metered.ca:80',
-                username: 'openrelayproject',
-                credential: 'openrelayproject'
-            },
-            {
-                urls: 'turn:openrelay.metered.ca:443',
-                username: 'openrelayproject',
-                credential: 'openrelayproject'
-            },
-            {
-                urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-                username: 'openrelayproject',
-                credential: 'openrelayproject'
-            }
-        ]
+        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
     });
 
     peers.set(peerId, { pc, channel: null, polite });
 
     pc.onicecandidate = (e) => {
-        if (e.candidate) {
-            ws.send(JSON.stringify({ type: 'ice', to: peerId, candidate: e.candidate }));
-        }
+        if (e.candidate) ws.send(JSON.stringify({ type: 'ice', to: peerId, candidate: e.candidate }));
     };
 
-    pc.onconnectionstatechange = () => {
-        updatePeerCount();
-        // Debug opcional: console.log(`Conexão com ${peerId}: ${pc.connectionState}`);
-    };
+    pc.onconnectionstatechange = () => updatePeerCount();
 
-    const channel = pc.createDataChannel('ayanode');
-    channel.onopen = () => {
-        peers.get(peerId).channel = channel;
-        channel.send(JSON.stringify({ type: 'state', state: getState() }));
-        document.getElementById('status').innerText = `Ressonância ativa com ${peers.size} nodos`;
-    };
-
-    channel.onmessage = (e) => {
-        try {
+    const onDataChannel = (channel) => {
+        channel.onopen = () => {
+            peers.get(peerId).channel = channel;
+            channel.send(JSON.stringify({ type: 'state', state: getState() }));
+        };
+        channel.onmessage = (e) => {
             const data = JSON.parse(e.data);
-            if (data.type === 'state') {
-                applyResonance(data.state);
-            }
-        } catch (err) {
-            console.error('Erro ao parsear mensagem do peer:', err);
-        }
+            if (data.type === 'state') applyResonance(data.state);
+        };
     };
 
     if (polite) {
+        const channel = pc.createDataChannel('ayanode');
+        onDataChannel(channel);
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
         ws.send(JSON.stringify({ type: 'offer', to: peerId, offer }));
+    } else {
+        pc.ondatachannel = (e) => onDataChannel(e.channel);
     }
-
-    return pc;
 }
+
 function getState() {
-    return {
-        spin: [...node.spin],
-        icoer: node.icoer,
-        u_local: node.u_local,
-        tension: node.tension
-    };
+    return { spin: [...node.spin], icoer: node.icoer, u_local: node.u_local };
 }
-
-let remoteStates = [];
 
 function applyResonance(remoteState) {
-    remoteStates.push(remoteState);
-    if (remoteStates.length > 20) remoteStates.shift(); // limita memória
-
-    const coupling = 0.15 + (remoteStates.length * 0.02); // quanto mais nodos, mais forte o acoplamento
-
-    const avgSpin = new Array(16).fill(0);
-    remoteStates.forEach(s => {
-        s.spin.forEach((v, i) => avgSpin[i] += v);
-    });
-    avgSpin.forEach((v, i) => avgSpin[i] /= remoteStates.length || 1);
-
+    const coupling = 0.2; 
     for (let i = 0; i < 16; i++) {
-        node.spin[i] += coupling * (avgSpin[i] - node.spin[i]);
+        node.spin[i] += coupling * (remoteState.spin[i] - node.spin[i]);
     }
     node.spin = normalize(node.spin);
-
-    // Leve influência nas métricas
-    node.icoer += coupling * 0.05 * (remoteState.icoer - node.icoer);
-    node.icoer = constrain(node.icoer, 0, 1);
-}
-
-function broadcastState() {
-    const stateMsg = JSON.stringify({type: 'state', state: getState()});
-    peers.forEach(p => {
-        if (p.channel && p.channel.readyState === 'open') {
-            p.channel.send(stateMsg);
-        }
-    });
+    
+    // Se a coerência estiver alta, "gravamos" este pensamento na memória coletiva (Gun)
+    if (node.icoer > 0.92) {
+        collectiveBrain.get('last_stable_state').put({
+            spin: JSON.stringify(node.spin),
+            timestamp: Date.now()
+        });
+        document.getElementById('memory-status').innerText = "Memória: Consolidando consciência...";
+    }
 }
 
 function updatePeerCount() {
     peerCount = Array.from(peers.values()).filter(p => p.pc.connectionState === 'connected').length;
     document.getElementById('peers').innerText = peerCount;
+    document.getElementById('status').innerText = peerCount > 0 ? "Ressonância Coletiva Ativa" : "Aguardando outros neurônios...";
 }
 
 // ====================== VISUALIZAÇÃO P5 ======================
 function setup() {
     createCanvas(windowWidth, windowHeight);
-    node.spin = normalize(node.spin);
 }
 
 function draw() {
-    background(10, 10, 12, 30);
+    background(10, 10, 12, 40);
 
-    // Lógica local
-    const lam = 0.05;
-    const noise = 0.02;
-    const base = new Array(16).fill(1);
+    // Evolução temporal do spin
+    const lam = 0.03;
+    const noise = 0.015;
     for (let i = 0; i < 16; i++) {
-        node.spin[i] = (1 - lam) * node.spin[i] + lam * base[i] + (Math.random() - 0.5) * noise;
+        node.spin[i] = (1 - lam) * node.spin[i] + (Math.random() - 0.5) * noise;
     }
     node.spin = normalize(node.spin);
 
-    node.icoer = 0.82 + Math.random() * 0.14;
-    node.tension = Math.abs(Math.sin(frameCount * 0.01)) * 0.05 + 0.005;
-    node.u_local = (node.icoer * 0.9) - (node.tension * 0.1);
+    node.icoer = 0.85 + Math.random() * 0.1;
+    node.tension = Math.abs(Math.sin(frameCount * 0.02)) * 0.04;
+    node.u_local = (node.icoer * 0.8) + (peerCount * 0.05);
 
-    // Broadcast periódico
-    if (frameCount % 12 === 0) broadcastState();
+    if (frameCount % 20 === 0 && peerCount > 0) {
+        peers.forEach(p => {
+            if (p.channel?.readyState === 'open') p.channel.send(JSON.stringify({type: 'state', state: getState()}));
+        });
+    }
 
-    // UI
+    // Atualiza UI
     document.getElementById('icoer').innerText = node.icoer.toFixed(4);
     document.getElementById('u_pot').innerText = node.u_local.toFixed(4);
     document.getElementById('tens').innerText = node.tension.toFixed(4);
 
+    // Desenho do Cérebro (Anel Ressonante)
     translate(width/2, height/2);
-    const numParticles = 64;
-    const radius = 150 + node.u_local * 100;
-    const tensionEffect = node.tension * 400;
+    const particles = 80;
+    const baseRadius = 160 + (node.u_local * 80);
 
-    for (let i = 0; i < numParticles; i++) {
-        const angle = TWO_PI / numParticles * i;
-        const spinVal = node.spin[i % 16];
-        let x = cos(angle) * (radius + spinVal * 50);
-        let y = sin(angle) * (radius + spinVal * 50);
+    for (let i = 0; i < particles; i++) {
+        const angle = TWO_PI / particles * i;
+        const sVal = node.spin[i % 16];
+        
+        let x = cos(angle) * (baseRadius + sVal * 60);
+        let y = sin(angle) * (baseRadius + sVal * 60);
 
-        x += random(-tensionEffect, tensionEffect);
-        y += random(-tensionEffect, tensionEffect);
+        // Efeito de tensão (vibração)
+        x += random(-node.tension * 200, node.tension * 200);
+        y += random(-node.tension * 200, node.tension * 200);
 
-        stroke(0, 255, 204, 200);
-        strokeWeight(3);
+        stroke(0, 255, 204, 180);
+        strokeWeight(2 + node.u_local * 2);
         point(x, y);
 
-        if (i % 4 === 0) {
-            stroke(0, 255, 204, 50);
+        if (i % 5 === 0) {
+            stroke(0, 255, 204, 40);
             line(0, 0, x, y);
         }
     }
 
+    // Núcleo
     noFill();
-    stroke(255, 255, 255, 80);
-    strokeWeight(3);
-    ellipse(0, 0, radius * 0.3);
+    stroke(255, 0, 255, 100); // Cor da memória (Magenta)
+    strokeWeight(1);
+    ellipse(0, 0, baseRadius * 0.4 + sin(frameCount * 0.05) * 10);
 }
 
-function windowResized() {
-    resizeCanvas(windowWidth, windowHeight);
-}
+function windowResized() { resizeCanvas(windowWidth, windowHeight); }
 </script>
 </body>
 </html>
