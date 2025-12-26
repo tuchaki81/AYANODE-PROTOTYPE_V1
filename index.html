@@ -40,7 +40,7 @@ function normalize(v) {
 }
 
 // ====================== WEBRTC P2P ======================
-const SIGNALING_SERVER = 'https://ayanode-p2p-signaling.onrender.com'; // ← TROQUE AQUI
+const SIGNALING_SERVER = 'wss://ayanode-p2p-signaling.onrender.com'; // ← TROQUE AQUI
 let peers = new Map(); // peerId → {pc, channel}
 let myId = Math.random().toString(36).substring(2, 9);
 let peerCount = 0;
@@ -251,3 +251,4 @@ function windowResized() {
 </script>
 </body>
 </html>
+
