@@ -1,27 +1,20 @@
-An interactive visualization of a **resonant node** architecture inspired by concepts of complex networks, spin networks (loop quantum gravity), and emergent dynamics in distributed AI systems.
+OFFICIAL LAUNCH: AYANODE // P2P RESONANCE V1 A decentralized resonant node architecture now alive and open to the world! AYANODE is more than a hypnotic visualization in p5.js — it's a 100% peer-to-peer functional prototype that demonstrates collective resonance in real time: Each browser that opens the page becomes an active node in the network.
+Direct connections via WebRTC (no central data server).
+States (16D spin, coherence, potential, tension) mutually influence each other → emergence of synchronized patterns.
+The more connected nodes, the stronger and more stable the global resonance.
 
-The prototype simulates in real time three main metrics of a hypothetical node:
-- **Internal Coherence (I)**: degree of alignment of internal states.
-- **Local Potential (U)**: processing capacity or "energy" available.
-- **Stress (T)**: external interference or network stress.
+Practical utility: Intuitive health monitoring of distributed networks (edge ​​computing, federated learning, blockchain).
+Visualization of metrics in AI ensembles or neuromorphic systems.
+Tool for research in complexity, emergence, and collective resilience.
+Scalable base for real-time collaborative dashboards. Inherent scalability: Fully P2P: no central bottleneck — scales with the number of participants.
+Lightweight signaling (free on Render) supports hundreds of simultaneous nodes.
+Minimal state traffic; direct connections between peers.
+Ready to evolve: multi-network, real data integration, metrics export.
 
-These metrics directly influence the visual geometry: particles orbit a central nucleus, react to the 16-dimensional spin vector, and tremble as the stress increases.
-
-More than generative art, AYANODE serves as an **exploratory prototype** for:
-- Intuitive visualization of node health and state in distributed systems (edge ​​computing, federated learning, blockchain).
-- Monitoring metrics in AI model ensembles.
-
-- Conceptual exploration of neuromorphic architectures and resonance in emergent computing.
-
-- Educational tool on emergence, coherence, and resilience in complex networks.
-
-## Live Demo
+Open now and join the global resonant network:
 
 https://dreamy-faun-2b7914.netlify.app/
 
-### HTML Version / p5.js (original - 2D)
-Open directly in your browser:
-[AYANODE_v1.html](AYANODE_v1.html)
+The more people open at the same time, the more powerful the collective coherence becomes. Test with friends and watch the emergence happen!
 
 Simply download the file or click to run — no server required.
-
