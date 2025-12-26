@@ -23,17 +23,3 @@ Abra diretamente no navegador:
 
 Basta baixar o arquivo ou clicar para executar — não precisa de servidor.
 
-### Versão Google Colab (interativa em notebook)
-https://colab.research.google.com/drive/SEU_LINK_AQUI  
-(Ideal para compartilhar com pesquisadores e integrar com análise de dados em Python)
-
-### Versão 3D - Web VPython (GlowScript)
-https://www.glowscript.org/#/user/SEU_USUARIO/folder/Public/program/AYANODE_3D  
-(Navegável em 3D: rotacione com botão direito, zoom com scroll)
-
-## Como executar localmente
-
-1. Clone o repositório:
-```bash
-git clone https://github.com/SEU_USUARIO/ayanode-prototype.git
-cd ayanode-prototype
