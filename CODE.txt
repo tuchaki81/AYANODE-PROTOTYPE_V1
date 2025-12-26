@@ -3,74 +3,119 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AYANODE // COLLECTIVE CONSCIOUSNESS V1.1</title>
+    <title>AYANODE // COLLECTIVE CONSCIOUSNESS V1.2</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
     <style>
         body { margin: 0; background: #0a0a0c; color: #fff; font-family: 'Courier New', monospace; overflow: hidden; }
-        #ui { position: absolute; top: 20px; left: 20px; z-index: 10; padding: 15px; background: rgba(0,0,0,0.7); border-radius: 8px; border: 1px solid #00ffcc44; box-shadow: 0 0 20px rgba(0,255,204,0.1); }
-        .metric { margin-bottom: 10px; font-size: 14px; letter-spacing: 1.5px; }
-        .val { font-weight: bold; color: #00ffcc; text-shadow: 0 0 10px #00ffcc; }
-        h1 { font-size: 18px; margin-bottom: 20px; opacity: 0.9; text-shadow: 0 0 15px #00ffcc; border-bottom: 1px solid #00ffcc33; padding-bottom: 10px; }
-        #status { font-size: 12px; color: #00ffaa; margin-top: 10px; font-style: italic; }
-        #memory-status { font-size: 11px; color: #ff00ff; margin-top: 5px; opacity: 0.8; }
+        
+        /* Garantir que a UI esteja sempre visível e acima do canvas */
+        #ui { 
+            position: absolute; 
+            top: 20px; 
+            left: 20px; 
+            z-index: 9999; 
+            padding: 20px; 
+            background: rgba(10, 10, 12, 0.9); 
+            border-radius: 8px; 
+            border: 1px solid #00ffcc; 
+            box-shadow: 0 0 20px rgba(0,255,204,0.2); 
+            width: 300px;
+            pointer-events: auto;
+        }
+
+        h1 { font-size: 16px; margin: 0 0 15px 0; color: #00ffcc; text-transform: uppercase; border-bottom: 1px solid #00ffcc33; padding-bottom: 10px; }
+        .metric { margin-bottom: 8px; font-size: 13px; display: flex; justify-content: space-between; }
+        .val { font-weight: bold; color: #00ffcc; }
+        
+        #intent-box { margin-top: 20px; padding-top: 15px; border-top: 1px dashed #00ffcc44; }
+        input { 
+            background: rgba(0, 255, 204, 0.1); 
+            border: 1px solid #00ffcc; 
+            color: #00ffcc; 
+            padding: 10px; 
+            width: calc(100% - 22px); 
+            margin-bottom: 10px; 
+            outline: none;
+            font-family: 'Courier New';
+        }
+        button { 
+            background: #00ffcc; 
+            color: #000; 
+            border: none; 
+            padding: 10px; 
+            width: 100%; 
+            font-weight: bold; 
+            cursor: pointer; 
+            font-family: 'Courier New';
+            transition: 0.2s;
+        }
+        button:hover { background: #fff; box-shadow: 0 0 15px #fff; }
+        
+        #status { font-size: 11px; color: #00ffaa; margin-top: 15px; font-style: italic; }
+        #memory-status { font-size: 10px; color: #ff00ff; margin-top: 5px; opacity: 0.8; }
     </style>
 </head>
 <body>
+
     <div id="ui">
-        <h1>AYANODE // SYST. CÉREBRO COLETIVO</h1>
-        <div class="metric">DOMÍNIO: <span class="val">ONTOLOGIA INFORMACIONAL</span></div>
-        <div class="metric">NODOS ATIVOS: <span id="peers" class="val">0</span></div>
+        <h1>AYANODE // CÉREBRO COLETIVO</h1>
+        <div class="metric">PEERS ATIVOS: <span id="peers" class="val">0</span></div>
         <div class="metric">COERÊNCIA (I): <span id="icoer" class="val">0.0000</span></div>
         <div class="metric">POTENCIAL (U): <span id="u_pot" class="val">0.0000</span></div>
         <div class="metric">TENSÃO (T): <span id="tens" class="val">0.0000</span></div>
-        <div id="status">Iniciando sinapses...</div>
-        <div id="memory-status">Memória: Sincronizando com o passado...</div>
+        
+        <div id="intent-box">
+            <div style="font-size: 11px; margin-bottom: 5px;">INJETAR INTENÇÃO NO SUBSTRATO:</div>
+            <input type="text" id="intentInput" placeholder="Escreve uma ideia...">
+            <button onclick="injetarIntencao()">SINCRONIZAR</button>
+        </div>
+
+        <div id="status">Substrato operacional.</div>
+        <div id="memory-status">Memória: Sincronizando...</div>
     </div>
 
 <script>
-// ====================== CONFIGURAÇÃO DE MEMÓRIA (GUN) ======================
-const gun = Gun(['https://gun-manhattan.herokuapp.com/gun', 'https://relay.peer.ooo/gun']);
-const collectiveBrain = gun.get('ayanode_prototype_v1_collective_memory');
+// ====================== MEMÓRIA DESCENTRALIZADA (GUN) ======================
+const gun = Gun(['https://gun-manhattan.herokuapp.com/gun']);
+const collectiveBrain = gun.get('ayanode_v1_2_core');
 
-// ====================== DEFINIÇÃO DO NODO ======================
+// ====================== ESTADO DO NODO & MOTOR ONTOLÓGICO ======================
 let node = {
     spin: Array.from({length: 16}, () => Math.random() * 2 - 1),
     icoer: 0.0,
-    u_local: 0.0,
-    tension: 0.0,
-    isRecovered: false
+    u_local: 0.5,
+    tension: 0.0
 };
 
-// ====================== MOTOR ONTOLÓGICO (TEORIA DO SPIN) ======================
-const D = 12;      // Dimensões holográficas
-const ALPHA = 1.0; // Peso da Coerência
-const GAMMA = 0.1; // Peso da Tensão
+const D = 12; // Dimensões holográficas
+const ALPHA = 1.0; 
+const GAMMA = 0.15; 
+
+function normalize(v) {
+    let norm = Math.sqrt(v.reduce((a, b) => a + b*b, 0)) + 1e-12;
+    return v.map(x => x / norm);
+}
 
 function calcularAcaoU(localSpin, remoteSpins) {
-    if (remoteSpins.length === 0) return 0.5; 
+    if (remoteSpins.length === 0) return 0.5;
 
-    // Referência: média dos spins na vizinhança (Eq. 4.2)
     let ref = localSpin.map((val, idx) => {
         let sum = val + remoteSpins.reduce((a, b) => a + b[idx], 0);
         return sum / (remoteSpins.length + 1);
     });
     
-    // Coerência (I) - Eq. 4.1
     let icoer = remoteSpins.reduce((acc, remote) => {
         let dot = localSpin.reduce((a, b, i) => a + b * remote[i], 0);
-        let dist = 0.5 * (1.0 - dot); // Métrica de Sobreposição
+        let dist = 0.5 * (1.0 - dot); 
         return acc + Math.pow(1.0 - dist, D);
     }, 0) / remoteSpins.length;
 
-    // Tensão (T) - Eq. 6.2
-    let currentTension = localSpin.reduce((acc, val, i) => acc + Math.pow(Math.abs(val - ref[i]), D), 0);
-    let t_norm = Math.log(1 + currentTension) / (1 + Math.log(1 + currentTension));
+    let t_raw = localSpin.reduce((acc, val, i) => acc + Math.pow(Math.abs(val - ref[i]), D), 0);
+    let t_norm = Math.log(1 + t_raw) / (1 + Math.log(1 + t_raw));
 
     node.icoer = icoer;
     node.tension = t_norm;
-
-    // Ação Unificada (U) - Eq. 7.8
     return (ALPHA * icoer) - (GAMMA * t_norm);
 }
 
@@ -84,32 +129,50 @@ function evoluirNodo() {
     let originalSpin = [...node.spin];
     let originalU = calcularAcaoU(originalSpin, remoteStates);
     
-    // Gradiente Ascendente: Pequenas mutações para maximizar U
-    for (let i = 0; i < 16; i++) {
-        node.spin[i] += (Math.random() - 0.5) * 0.1; 
-        let newU = calcularAcaoU(node.spin, remoteStates);
+    // Gradiente Ascendente (Otimização da Ação U)
+    for (let i = 0; i < 20; i++) {
+        let idx = Math.floor(Math.random() * 16);
+        let prev = node.spin[idx];
+        node.spin[idx] += (Math.random() - 0.5) * 0.2;
+        node.spin = normalize(node.spin);
         
+        let newU = calcularAcaoU(node.spin, remoteStates);
         if (newU < originalU) {
-            node.spin[i] = originalSpin[i]; 
+            node.spin[idx] = prev;
+            node.spin = normalize(node.spin);
         } else {
             originalU = newU;
         }
     }
-    node.spin = normalize(node.spin);
     node.u_local = originalU;
+
+    // Memória de Longo Prazo
+    if (node.icoer > 0.97) {
+        collectiveBrain.get('truths').set({ spin: JSON.stringify(node.spin), u: node.u_local });
+        document.getElementById('memory-status').innerText = "Memória: Cristalização de Verdade.";
+    }
 }
 
-function normalize(v) {
-    let norm = Math.sqrt(v.reduce((a, b) => a + b*b, 0)) + 1e-12;
-    return v.map(x => x / norm);
+function injetarIntencao() {
+    const texto = document.getElementById('intentInput').value;
+    if (!texto) return;
+
+    let novoSpin = new Array(16).fill(0);
+    for (let i = 0; i < texto.length; i++) {
+        const charCode = texto.charCodeAt(i);
+        novoSpin[i % 16] += Math.sin(charCode * (i + 1));
+    }
+    node.spin = normalize(novoSpin);
+    node.tension = 0.95; // Pico de tensão pela nova informação
+    document.getElementById('status').innerText = "Propagando intenção...";
+    broadcastState();
 }
 
-// ====================== WEBRTC P2P & SINALIZAÇÃO ======================
+// ====================== REDE P2P & SINALIZAÇÃO ======================
 const SIGNALING_SERVER = 'wss://ayanode-p2p-signaling.onrender.com';
 let peers = new Map();
 let myId = Math.random().toString(36).substring(2, 9);
 let peerCount = 0;
-
 const ws = new WebSocket(SIGNALING_SERVER);
 
 ws.onmessage = async (event) => {
@@ -125,137 +188,91 @@ ws.onmessage = async (event) => {
     else if (msg.type === 'answer') await peers.get(msg.from).pc.setRemoteDescription(msg.answer);
     else if (msg.type === 'ice') await peers.get(msg.from).pc.addIceCandidate(msg.candidate);
     else if (msg.type === 'list') {
-        for (const peerId of msg.peers) {
-            if (peerId !== myId && !peers.has(peerId)) await createPeerConnection(peerId, true);
-        }
+        msg.peers.forEach(id => { if (id !== myId && !peers.has(id)) createPeerConnection(id, true); });
     }
 };
 
 async function createPeerConnection(peerId, polite) {
     const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
-    peers.set(peerId, { pc, channel: null, polite, state: null });
+    peers.set(peerId, { pc, channel: null, state: null });
 
-    pc.onicecandidate = (e) => {
-        if (e.candidate) ws.send(JSON.stringify({ type: 'ice', to: peerId, candidate: e.candidate }));
+    pc.onicecandidate = (e) => e.candidate && ws.send(JSON.stringify({ type: 'ice', to: peerId, candidate: e.candidate }));
+    pc.onconnectionstatechange = () => {
+        peerCount = Array.from(peers.values()).filter(p => p.pc.connectionState === 'connected').length;
+        document.getElementById('peers').innerText = peerCount;
     };
 
-    pc.onconnectionstatechange = () => updatePeerCount();
-
-    const onDataChannel = (channel) => {
-        channel.onopen = () => {
-            peers.get(peerId).channel = channel;
-            channel.send(JSON.stringify({ type: 'state', state: getState() }));
+    const handleChannel = (chan) => {
+        chan.onopen = () => chan.send(JSON.stringify({ type: 'state', state: getState() }));
+        chan.onmessage = (e) => {
+            const d = JSON.parse(e.data);
+            if (d.type === 'state') peers.get(peerId).state = d.state;
         };
-        channel.onmessage = (e) => {
-            const data = JSON.parse(e.data);
-            if (data.type === 'state') {
-                peers.get(peerId).state = data.state;
-                applyResonance(data.state);
-            }
-        };
+        peers.get(peerId).channel = chan;
     };
 
     if (polite) {
-        const channel = pc.createDataChannel('ayanode');
-        onDataChannel(channel);
+        const c = pc.createDataChannel('ayanode');
+        handleChannel(c);
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
         ws.send(JSON.stringify({ type: 'offer', to: peerId, offer }));
     } else {
-        pc.ondatachannel = (e) => onDataChannel(e.channel);
+        pc.ondatachannel = (e) => handleChannel(e.channel);
     }
 }
 
-function getState() {
-    return { spin: [...node.spin], icoer: node.icoer, u_local: node.u_local };
-}
-
-function applyResonance(remoteState) {
-    // A ressonância agora é integrada via evoluirNodo, mas mantemos o acoplamento rápido
-    const coupling = 0.05; 
-    for (let i = 0; i < 16; i++) {
-        node.spin[i] += coupling * (remoteState.spin[i] - node.spin[i]);
-    }
-    node.spin = normalize(node.spin);
-    
-    if (node.icoer > 0.95) {
-        collectiveBrain.get('last_stable_state').put({
-            spin: JSON.stringify(node.spin),
-            timestamp: Date.now()
-        });
-        document.getElementById('memory-status').innerText = "Memória: Consolidando consciência coletiva...";
-    }
-}
-
-function updatePeerCount() {
-    peerCount = Array.from(peers.values()).filter(p => p.pc.connectionState === 'connected').length;
-    document.getElementById('peers').innerText = peerCount;
-    document.getElementById('status').innerText = peerCount > 0 ? "Ressonância Ativa" : "Aguardando outros neurônios...";
+function getState() { return { spin: [...node.spin], u_local: node.u_local }; }
+function broadcastState() {
+    peers.forEach(p => p.channel?.readyState === 'open' && p.channel.send(JSON.stringify({type: 'state', state: getState()})));
 }
 
 // ====================== VISUALIZAÇÃO P5 ======================
 function setup() {
-    createCanvas(windowWidth, windowHeight);
+    let canvas = createCanvas(windowWidth, windowHeight);
+    canvas.style('display', 'block');
 }
 
 function draw() {
     background(10, 10, 12, 45);
 
     if (peerCount > 0) {
-        evoluirNodo(); // Busca ativa por Ação Unificada
+        evoluirNodo();
+        if (frameCount % 60 === 0) broadcastState();
     } else {
-        // Ruído térmico do substrato quando isolado
-        for (let i = 0; i < 16; i++) {
-            node.spin[i] += (Math.random() - 0.5) * 0.02;
-        }
+        for (let i = 0; i < 16; i++) node.spin[i] += (Math.random() - 0.5) * 0.01;
         node.spin = normalize(node.spin);
-        node.u_local = 0.1; 
-        node.tension = 0.05;
+        node.u_local = 0.1;
+        node.tension = 0.02;
     }
 
-    if (frameCount % 30 === 0 && peerCount > 0) {
-        peers.forEach(p => {
-            if (p.channel?.readyState === 'open') p.channel.send(JSON.stringify({type: 'state', state: getState()}));
-        });
-    }
-
-    // Atualiza UI
+    // Update UI
     document.getElementById('icoer').innerText = node.icoer.toFixed(4);
     document.getElementById('u_pot').innerText = node.u_local.toFixed(4);
     document.getElementById('tens').innerText = node.tension.toFixed(4);
 
-    // Renderização do Vórtice Informacional
-    
+    // Desenho do Vórtice
     translate(width/2, height/2);
-    const particles = 120;
-    const baseRadius = 150 + (node.u_local * 100);
+    const particles = 100;
+    const baseRadius = 180 + (node.u_local * 120);
 
     for (let i = 0; i < particles; i++) {
         const angle = TWO_PI / particles * i;
         const sVal = node.spin[i % 16];
-        
-        let x = cos(angle) * (baseRadius + sVal * 70);
-        let y = sin(angle) * (baseRadius + sVal * 70);
+        let x = cos(angle) * (baseRadius + sVal * 80);
+        let y = sin(angle) * (baseRadius + sVal * 80);
 
-        // A tensão distorce o substrato espacialmente
-        x += random(-node.tension * 150, node.tension * 150);
-        y += random(-node.tension * 150, node.tension * 150);
+        x += random(-node.tension * 300, node.tension * 300);
+        y += random(-node.tension * 300, node.tension * 300);
 
         stroke(0, 255, 204, 180);
-        strokeWeight(1.5 + node.icoer * 3);
+        strokeWeight(1.5 + (node.icoer * 4));
         point(x, y);
-
-        if (i % 6 === 0) {
-            stroke(0, 255, 204, 30);
-            line(0, 0, x, y);
-        }
     }
 
-    // Núcleo (Singularidade Informacional)
     noFill();
-    stroke(255, 0, 255, 150); 
-    strokeWeight(1);
-    ellipse(0, 0, baseRadius * 0.3 + sin(frameCount * 0.05) * 15);
+    stroke(255, 0, 255, 100 + (node.tension * 155));
+    ellipse(0, 0, baseRadius * 0.2 + sin(frameCount * 0.1) * 15);
 }
 
 function windowResized() { resizeCanvas(windowWidth, windowHeight); }
