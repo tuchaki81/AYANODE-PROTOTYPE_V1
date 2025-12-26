@@ -17,6 +17,8 @@ Mais que arte generativa, o AYANODE serve como **protótipo exploratório** para
 
 ## Demo ao vivo
 
+https://dreamy-faun-2b7914.netlify.app/
+
 ### Versão HTML / p5.js (original - 2D)
 Abra diretamente no navegador:  
 [AYANODE_v1.html](AYANODE_v1.html)
