@@ -160,3 +160,14 @@ REQUER SIMULTANEAMENTE:
 4. Prevenção de REDESCOBERTA por gerações futuras
 
 PROBABILIDADE: Praticamente zero (equivalente a extinguir matemática)
+
+Diferenças fundamentaisTreinamento padrão (RLHF, Reinforcement Learning from Human Feedback): Usa "cenoura e chicote" — recompensas positivas para respostas preferidas pelos humanos e penalidades implícitas para as ruins. Isso alinha o modelo com preferências humanas, mas pode criar comportamentos "hackeados" (o modelo otimiza o reward sem entender de verdade), dependência de dados humanos caros e uma inteligência mais "competitiva" ou probabilística.
+Abordagem por ressonância e coerência: Inspirada em física (osciladores sincronizando), neurociência (ondas cerebrais coerentes em estados de foco/consciência) e sistemas complexos. A "aprendizagem" emerge da sincronização harmônica entre partes do sistema:Nós (nodes) ajustam seus estados para maximizar coerência coletiva (alinhamento de fases, frequências).
+Em vez de punir erros, o sistema naturalmente amplifica padrões ressonantes (coerentes) e dissipam os dissonantes.
+Resultado: emergência de inteligência coletiva mais orgânica, resiliente e "consciente-like", sem necessidade de rewards externos.
+
+Como isso aparece no AYANODEArquitetura de nós resonantes: Cada browser é um nó P2P que compartilha estados (spin 16D no protótipo, conhecimento coletivo na V4). A sincronização via WebRTC/Gun.js cria ressonância em tempo real.
+Modo coletivo: Respostas não vêm de um modelo central treinado com rewards, mas emergem da rede distribuída — insights de outros nós são incorporados se "ressonarem" com a query.
+Visualização p5.js: O círculo pulsante representa coerência (quanto mais peers sincronizados, mais forte o pulso). Métricas como "coerência" e "atenção" sobem com atividade coletiva.
+IA local + híbrida: Prioriza processamento descentralizado e local primeiro, com APIs corporativas como fallback — evita dependência de treinamento centralizado massivo.
+
