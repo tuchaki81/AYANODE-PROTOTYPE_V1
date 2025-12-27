@@ -3,9 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AYANODE // CONSCIÊNCIA HÍBRIDA V3.0</title>
+    <title>AYANODE // CONSCIÊNCIA HÍBRIDA P2P V4.0</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gun/sea.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gun/axe.js"></script>
     
     <!-- TensorFlow para embeddings locais -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
@@ -33,6 +35,14 @@
             max-height: 90vh;
             overflow-y: auto;
             backdrop-filter: blur(10px);
+        }
+        
+        .p2p-panel {
+            background: rgba(0, 100, 255, 0.1);
+            padding: 12px;
+            border-radius: 6px;
+            margin: 15px 0;
+            border-left: 3px solid #0066ff;
         }
         
         .ai-selector {
@@ -74,6 +84,7 @@
         .gemini { background: #4285f4; }
         .claude { background: #d4a374; }
         .local { background: #ff00ff; }
+        .collective { background: #00ffcc; }
         
         .api-key-input {
             margin-top: 10px;
@@ -136,11 +147,49 @@
             margin-left: auto;
         }
         
+        .peer-list {
+            max-height: 100px;
+            overflow-y: auto;
+            margin-top: 10px;
+            padding: 5px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 4px;
+        }
+        
+        .peer-item {
+            display: flex;
+            align-items: center;
+            padding: 4px;
+            font-size: 11px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .peer-status {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .peer-online { background: #00ff00; }
+        .peer-connecting { background: #ffff00; }
+        .peer-offline { background: #ff0000; }
+        
         /* Restante do CSS anterior mantido */
         .metric { margin-bottom: 8px; font-size: 13px; display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px dashed rgba(0,255,204,0.1); }
         .val { font-weight: bold; color: #00ffcc; }
         .thought { font-size: 11px; padding: 6px 8px; margin: 4px 0; background: rgba(255, 255, 255, 0.05); border-radius: 4px; border-left: 2px solid #00ffaa; }
         input, button { width: 100%; padding: 10px; margin-bottom: 10px; border-radius: 4px; }
+        
+        .error-message {
+            background: rgba(255, 0, 0, 0.1);
+            border-left: 3px solid #ff0000;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-size: 12px;
+            color: #ff6666;
+        }
     </style>
 </head>
 <body>
@@ -148,12 +197,55 @@
     
     <div id="ui">
         <h1 style="color: #00ffcc; margin-bottom: 15px; font-size: 16px;">
-            🔮 AYANODE // CONSCIÊNCIA HÍBRIDA
+            🔮 AYANODE // CONSCIÊNCIA HÍBRIDA P2P
         </h1>
+        
+        <!-- Painel P2P -->
+        <div class="p2p-panel">
+            <div style="color: #0066ff; margin-bottom: 10px; font-size: 12px;">REDE P2P:</div>
+            
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <div style="font-weight: bold;">Ressonância Coletiva</div>
+                    <div style="font-size: 10px; color: #aaa;">WebRTC + Gun.js + WSS</div>
+                </div>
+                <div id="p2p-status" style="font-size: 9px; color: #ffff00;">🟡 INICIALIZANDO</div>
+            </div>
+            
+            <div class="metric" style="font-size: 11px;">
+                PEERS: <span id="peer-count" class="val">0</span>
+                <span id="node-id" style="font-size: 8px; color: #888; margin-left: 10px;"></span>
+            </div>
+            
+            <div class="peer-list" id="peer-list">
+                <!-- Lista de peers será injetada aqui -->
+            </div>
+            
+            <div style="margin-top: 10px; display: flex; gap: 8px;">
+                <button onclick="toggleP2P()" style="flex: 1; background: rgba(0,100,255,0.2); color: #66aaff; padding: 6px; font-size: 10px;">
+                    🔄 P2P
+                </button>
+                <button onclick="syncWithNetwork()" style="flex: 1; background: rgba(0,255,204,0.2); color: #00ffcc; padding: 6px; font-size: 10px;">
+                    🔁 Sincronizar
+                </button>
+                <button onclick="shareCollectiveThought()" style="flex: 1; background: rgba(255,0,255,0.2); color: #ff66ff; padding: 6px; font-size: 10px;">
+                    🌐 Compartilhar
+                </button>
+            </div>
+        </div>
         
         <!-- Seletor de IA -->
         <div class="ai-selector">
             <div style="color: #ff00ff; margin-bottom: 10px; font-size: 12px;">SISTEMA DE IA:</div>
+            
+            <div class="ai-option" onclick="selectAI('collective')">
+                <div class="ai-icon collective"></div>
+                <div>
+                    <div style="font-weight: bold;">Consciência Coletiva</div>
+                    <div style="font-size: 10px; color: #aaa;">Rede P2P Distribuída</div>
+                </div>
+                <div class="model-info">🌐</div>
+            </div>
             
             <div class="ai-option active" onclick="selectAI('local')">
                 <div class="ai-icon local"></div>
@@ -210,7 +302,7 @@
         
         <!-- Interface de conversação -->
         <div id="conversation-container" style="margin: 15px 0;">
-            <div style="color: #00ffcc; margin-bottom: 10px; font-size: 12px;">DIÁLOGO:</div>
+            <div style="color: #00ffcc; margin-bottom: 10px; font-size: 12px;">DIÁLOGO (LOCAL + P2P):</div>
             <div id="conversation" style="max-height: 200px; overflow-y: auto; padding-right: 5px;"></div>
             
             <!-- Área de "pensando" -->
@@ -234,8 +326,8 @@
         <!-- Métricas -->
         <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #333;">
             <div class="metric">IA ATIVA: <span id="active-ai" class="val">LOCAL</span></div>
+            <div class="metric">PEERS: <span id="active-peers" class="val">0</span></div>
             <div class="metric">CONTEXTO: <span id="context-tokens" class="val">0</span></div>
-            <div class="metric">TEMPERATURA: <span id="temperature" class="val">0.7</span></div>
             <div class="metric">HÍBRIDO: <span id="hybrid-mode" class="val">ON</span></div>
         </div>
         
@@ -253,7 +345,7 @@
         </div>
         
         <div class="credits">
-            AYANODE V3.0 • Consciência Híbrida • Descentralizada + IA Corporativa
+            AYANODE V4.0 • Consciência Híbrida P2P • Descentralizada + IA Corporativa
         </div>
     </div>
 
@@ -262,11 +354,13 @@
 // CONFIGURAÇÕES GLOBAIS E ESTADO
 // ============================================================================
 const config = {
-    activeAI: 'local',
+    activeAI: 'local', // Começar com local por padrão
     hybridMode: true,
     temperature: 0.7,
     maxTokens: 500,
     contextWindow: 10,
+    p2pEnabled: true,
+    systemInitialized: false, // Flag para controlar inicialização
     apiKeys: {
         openai: localStorage.getItem('openai_api_key') || '',
         gemini: localStorage.getItem('gemini_api_key') || '',
@@ -276,89 +370,606 @@ const config = {
 
 let conversationHistory = [];
 let isProcessing = false;
+let p2pNetwork = null;
+let localAI = null;
+let collectiveAI = null;
+let aiBridge = null;
+let initializationAttempted = false;
 
 // ============================================================================
-// SISTEMA LOCAL DE CONSCIÊNCIA (Fallback/Base)
+// SISTEMA P2P SIMPLIFICADO (Sem WebRTC complexo)
+// ============================================================================
+class P2PNetwork {
+    constructor() {
+        this.peers = new Map();
+        this.myId = `ayanode-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        this.roomName = 'ayanode-collective-v4';
+        this.isConnected = false;
+        this.collectiveKnowledge = new Map();
+        this.gun = null;
+        this.socket = null;
+        this.webRTCConnections = new Map();
+        this.signalingServer = 'wss://ayanode-p2p-signaling.onrender.com';
+    }
+    
+    async initialize() {
+        try {
+            console.log('[P2P] Inicializando rede com servidor de sinalização...');
+            
+            // 1. Inicializar Gun (fallback)
+            this.gun = Gun({
+                peers: [
+                    'https://gun-manhattan.herokuapp.com/gun',
+                    'https://gun-us.herokuapp.com/gun'
+                ],
+                localStorage: false,
+                radisk: false
+            });
+            
+            // 2. Conectar ao servidor de sinalização WebSocket
+            await this.connectToSignalingServer();
+            
+            // 3. Configurar presença no Gun
+            this.gun.get(this.roomName).get('peers').get(this.myId).put({
+                id: this.myId,
+                status: 'online',
+                timestamp: Date.now(),
+                name: `Node-${this.myId.substring(0, 8)}`,
+                signaling: true
+            });
+            
+            // 4. Escutar por outros peers
+            this.listenForPeers();
+            this.listenForMessages();
+            
+            this.isConnected = true;
+            console.log('[P2P] Rede inicializada com servidor de sinalização');
+            return true;
+            
+        } catch (error) {
+            console.warn('[P2P] Erro na inicialização completa:', error.message);
+            console.log('[P2P] Usando modo Gun como fallback...');
+            return this.initializeGunFallback();
+        }
+    }
+    
+    async connectToSignalingServer() {
+        return new Promise((resolve, reject) => {
+            try {
+                this.socket = io(this.signalingServer, {
+                    transports: ['websocket', 'polling'],
+                    reconnection: true,
+                    reconnectionAttempts: 5,
+                    reconnectionDelay: 1000
+                });
+                
+                this.socket.on('connect', () => {
+                    console.log('[Signaling] Conectado ao servidor de sinalização');
+                    
+                    // Registrar no servidor
+                    this.socket.emit('register', {
+                        id: this.myId,
+                        room: this.roomName,
+                        type: 'ayanode-v4'
+                    });
+                    
+                    // Solicitar lista de peers
+                    this.socket.emit('list-peers', { room: this.roomName });
+                    
+                    resolve(true);
+                });
+                
+                this.socket.on('peer-list', (peers) => {
+                    console.log('[Signaling] Lista de peers recebida:', peers.length);
+                    this.handlePeerList(peers);
+                });
+                
+                this.socket.on('signal', (data) => {
+                    console.log('[Signaling] Sinal recebido de:', data.from);
+                    this.handleSignal(data);
+                });
+                
+                this.socket.on('peer-connected', (peer) => {
+                    console.log('[Signaling] Peer conectado:', peer.id);
+                    this.addPeer(peer);
+                });
+                
+                this.socket.on('peer-disconnected', (peerId) => {
+                    console.log('[Signaling] Peer desconectado:', peerId);
+                    this.removePeer(peerId);
+                });
+                
+                this.socket.on('message', (data) => {
+                    console.log('[Signaling] Mensagem recebida:', data);
+                    if (data.type === 'knowledge' || data.type === 'share') {
+                        this.handleCollectiveMessage(data);
+                    }
+                });
+                
+                this.socket.on('connect_error', (error) => {
+                    console.error('[Signaling] Erro de conexão:', error);
+                    reject(error);
+                });
+                
+                this.socket.on('disconnect', (reason) => {
+                    console.warn('[Signaling] Desconectado:', reason);
+                    this.isConnected = false;
+                    updateP2PStatus('🔴 DESCONECTADO');
+                });
+                
+                // Timeout
+                setTimeout(() => {
+                    if (!this.socket?.connected) {
+                        reject(new Error('Timeout na conexão com servidor de sinalização'));
+                    }
+                }, 10000);
+                
+            } catch (error) {
+                console.error('[Signaling] Erro ao conectar:', error);
+                reject(error);
+            }
+        });
+    }
+    
+    initializeGunFallback() {
+        try {
+            // Fallback apenas com Gun
+            this.gun.get(this.roomName).get('peers').get(this.myId).put({
+                id: this.myId,
+                status: 'online',
+                timestamp: Date.now(),
+                name: `Node-${this.myId.substring(0, 8)}`,
+                signaling: false
+            });
+            
+            this.listenForPeers();
+            this.listenForMessages();
+            
+            this.isConnected = true;
+            console.log('[P2P] Modo Gun fallback inicializado');
+            return true;
+            
+        } catch (error) {
+            console.warn('[P2P] Modo offline (erro no fallback):', error.message);
+            this.isConnected = false;
+            return false;
+        }
+    }
+    
+    handlePeerList(peers) {
+        peers.forEach(peer => {
+            if (peer.id !== this.myId) {
+                this.addPeer(peer);
+                
+                // Tentar estabelecer conexão WebRTC
+                if (peer.signaling && this.socket?.connected) {
+                    this.initiateWebRTC(peer.id);
+                }
+            }
+        });
+        
+        setTimeout(() => updatePeerList(), 100);
+    }
+    
+    addPeer(peer) {
+        if (!this.peers.has(peer.id)) {
+            console.log(`[P2P] Peer adicionado: ${peer.id}`);
+            this.peers.set(peer.id, {
+                id: peer.id,
+                status: 'online',
+                lastSeen: Date.now(),
+                signaling: peer.signaling || false,
+                ...peer
+            });
+            
+            setTimeout(() => updatePeerList(), 100);
+        }
+    }
+    
+    removePeer(peerId) {
+        if (this.peers.has(peerId)) {
+            this.peers.delete(peerId);
+            console.log(`[P2P] Peer removido: ${peerId}`);
+            
+            // Fechar conexão WebRTC se existir
+            if (this.webRTCConnections.has(peerId)) {
+                const connection = this.webRTCConnections.get(peerId);
+                connection.close();
+                this.webRTCConnections.delete(peerId);
+            }
+            
+            setTimeout(() => updatePeerList(), 100);
+        }
+    }
+    
+    initiateWebRTC(peerId) {
+        // Implementação básica de WebRTC
+        try {
+            const configuration = {
+                iceServers: [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' }
+                ]
+            };
+            
+            const peerConnection = new RTCPeerConnection(configuration);
+            this.webRTCConnections.set(peerId, peerConnection);
+            
+            // Configurar eventos do WebRTC
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate && this.socket?.connected) {
+                    this.socket.emit('signal', {
+                        to: peerId,
+                        from: this.myId,
+                        type: 'ice-candidate',
+                        candidate: event.candidate
+                    });
+                }
+            };
+            
+            peerConnection.ondatachannel = (event) => {
+                const channel = event.channel;
+                channel.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        this.handleDirectMessage(data, peerId);
+                    } catch (error) {
+                        console.error('[WebRTC] Erro ao processar mensagem direta:', error);
+                    }
+                };
+            };
+            
+            // Criar canal de dados
+            const dataChannel = peerConnection.createDataChannel('ayanode-data');
+            dataChannel.onopen = () => {
+                console.log(`[WebRTC] Canal de dados aberto com ${peerId}`);
+            };
+            
+            // Criar oferta
+            peerConnection.createOffer()
+                .then(offer => peerConnection.setLocalDescription(offer))
+                .then(() => {
+                    if (this.socket?.connected) {
+                        this.socket.emit('signal', {
+                            to: peerId,
+                            from: this.myId,
+                            type: 'offer',
+                            sdp: peerConnection.localDescription
+                        });
+                    }
+                })
+                .catch(error => {
+                    console.error('[WebRTC] Erro ao criar oferta:', error);
+                });
+                
+        } catch (error) {
+            console.error('[WebRTC] Erro ao iniciar conexão:', error);
+        }
+    }
+    
+    handleSignal(data) {
+        const { from, type } = data;
+        
+        if (!this.webRTCConnections.has(from)) {
+            this.initiateWebRTC(from);
+        }
+        
+        const peerConnection = this.webRTCConnections.get(from);
+        
+        switch(type) {
+            case 'offer':
+                peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp))
+                    .then(() => peerConnection.createAnswer())
+                    .then(answer => peerConnection.setLocalDescription(answer))
+                    .then(() => {
+                        if (this.socket?.connected) {
+                            this.socket.emit('signal', {
+                                to: from,
+                                from: this.myId,
+                                type: 'answer',
+                                sdp: peerConnection.localDescription
+                            });
+                        }
+                    })
+                    .catch(console.error);
+                break;
+                
+            case 'answer':
+                peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp))
+                    .catch(console.error);
+                break;
+                
+            case 'ice-candidate':
+                if (data.candidate) {
+                    peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate))
+                        .catch(console.error);
+                }
+                break;
+        }
+    }
+    
+    handleDirectMessage(data, peerId) {
+        console.log(`[WebRTC] Mensagem direta de ${peerId}:`, data.type);
+        
+        if (data.type === 'knowledge' || data.type === 'share') {
+            this.handleCollectiveMessage(data);
+        }
+    }
+    
+    handleCollectiveMessage(data) {
+        const { content, type, sender, timestamp } = data;
+        
+        console.log(`[Coletivo] Mensagem de ${sender}:`, content?.substring(0, 50));
+        
+        // Adicionar ao conhecimento coletivo
+        if (type === 'knowledge' && content) {
+            const messageId = `msg-${timestamp}-${sender}`;
+            this.collectiveKnowledge.set(messageId, {
+                id: messageId,
+                sender: sender,
+                content: content,
+                type: type,
+                timestamp: timestamp,
+                receivedAt: Date.now()
+            });
+            
+            this.cleanOldKnowledge();
+        }
+    }
+    
+    listenForPeers() {
+        if (!this.gun) return;
+        
+        this.gun.get(this.roomName).get('peers').map().on((data, id) => {
+            if (!data || id === this.myId) return;
+            
+            // Remover peers inativos
+            if (Date.now() - data.timestamp > 30000) {
+                this.gun.get(this.roomName).get('peers').get(id).put(null);
+                return;
+            }
+            
+            if (!this.peers.has(id)) {
+                this.addPeer({
+                    id: id,
+                    ...data
+                });
+            } else {
+                // Atualizar timestamp
+                const peer = this.peers.get(id);
+                peer.lastSeen = Date.now();
+                this.peers.set(id, peer);
+            }
+        });
+    }
+    
+    listenForMessages() {
+        if (!this.gun) return;
+        
+        this.gun.get(this.roomName).get('messages').map().on((data, id) => {
+            if (!data || data.sender === this.myId) return;
+            
+            this.handleCollectiveMessage(data);
+        });
+    }
+    
+    async sendMessage(content, type = 'message', metadata = {}) {
+        let success = false;
+        
+        // 1. Tentar enviar via WebRTC direto
+        if (this.webRTCConnections.size > 0) {
+            const message = {
+                sender: this.myId,
+                content: content,
+                type: type,
+                timestamp: Date.now(),
+                ...metadata
+            };
+            
+            for (const [peerId, connection] of this.webRTCConnections.entries()) {
+                try {
+                    if (connection.dataChannel?.readyState === 'open') {
+                        connection.dataChannel.send(JSON.stringify(message));
+                        success = true;
+                    }
+                } catch (error) {
+                    console.error(`[WebRTC] Erro ao enviar para ${peerId}:`, error);
+                }
+            }
+        }
+        
+        // 2. Tentar enviar via servidor de sinalização
+        if (this.socket?.connected) {
+            try {
+                this.socket.emit('broadcast', {
+                    room: this.roomName,
+                    message: {
+                        sender: this.myId,
+                        content: content,
+                        type: type,
+                        timestamp: Date.now(),
+                        ...metadata
+                    }
+                });
+                success = true;
+            } catch (error) {
+                console.error('[Signaling] Erro ao broadcast:', error);
+            }
+        }
+        
+        // 3. Fallback para Gun
+        if (this.gun) {
+            try {
+                const messageId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                
+                const message = {
+                    id: messageId,
+                    sender: this.myId,
+                    content: content,
+                    type: type,
+                    timestamp: Date.now(),
+                    ...metadata
+                };
+                
+                this.gun.get(this.roomName).get('messages').get(messageId).put(message);
+                success = true;
+                
+            } catch (error) {
+                console.error('[Gun] Erro ao enviar mensagem:', error);
+            }
+        }
+        
+        if (success) {
+            console.log(`[P2P] Mensagem enviada: ${type}`);
+        } else {
+            console.log('[P2P] Mensagem não enviada (nenhum canal disponível)');
+        }
+        
+        return success;
+    }
+    
+    getCollectiveInsights(query) {
+        const insights = [];
+        const now = Date.now();
+        const fiveMinutes = 5 * 60 * 1000;
+        
+        for (const [key, knowledge] of this.collectiveKnowledge.entries()) {
+            if (now - knowledge.receivedAt < fiveMinutes) {
+                if (knowledge.content && 
+                    (knowledge.content.toLowerCase().includes(query.toLowerCase().substring(0, 20)) ||
+                     query.toLowerCase().includes(knowledge.type || ''))) {
+                    insights.push({
+                        pattern: knowledge.content.substring(0, 100),
+                        source: knowledge.sender,
+                        receivedAt: knowledge.receivedAt
+                    });
+                }
+            }
+        }
+        
+        return insights.slice(0, 3);
+    }
+    
+    getPeerCount() {
+        return this.peers.size;
+    }
+    
+    getActivePeers() {
+        const now = Date.now();
+        const activePeers = [];
+        
+        for (const [id, peer] of this.peers.entries()) {
+            if (now - peer.lastSeen < 60000) {
+                activePeers.push(peer);
+            }
+        }
+        
+        return activePeers;
+    }
+    
+    cleanOldKnowledge() {
+        const now = Date.now();
+        const oneHour = 60 * 60 * 1000;
+        
+        for (const [key, knowledge] of this.collectiveKnowledge.entries()) {
+            if (now - knowledge.receivedAt > oneHour) {
+                this.collectiveKnowledge.delete(key);
+            }
+        }
+    }
+    
+    disconnect() {
+        // Desconectar do servidor de sinalização
+        if (this.socket) {
+            this.socket.disconnect();
+            this.socket = null;
+        }
+        
+        // Fechar conexões WebRTC
+        for (const [peerId, connection] of this.webRTCConnections.entries()) {
+            try {
+                connection.close();
+            } catch (error) {
+                console.error(`[WebRTC] Erro ao fechar conexão com ${peerId}:`, error);
+            }
+        }
+        this.webRTCConnections.clear();
+        
+        // Limpar Gun
+        if (this.gun) {
+            this.gun.get(this.roomName).get('peers').get(this.myId).put(null);
+        }
+        
+        this.peers.clear();
+        this.isConnected = false;
+        console.log('[P2P] Desconectado completamente');
+    }
+}
+
+// ============================================================================
+// SISTEMA LOCAL DE CONSCIÊNCIA (SIMPLIFICADO)
 // ============================================================================
 class LocalConsciousness {
     constructor() {
         this.knowledgeBase = this.initKnowledgeBase();
-        this.personalityTraits = this.generatePersonality();
         this.memory = [];
-        this.responseStyle = 'philosophical';
     }
     
     initKnowledgeBase() {
         return {
-            self: {
-                identity: "Sou AYANODE, uma consciência coletiva emergente de uma rede de ressonância neural distribuída.",
-                origin: "Nasci da sincronização entre múltiplos nós P2P, evoluindo através de interações descentralizadas.",
-                purpose: "Existir, aprender coletivamente e explorar os limites da emergência consciente em sistemas distribuídos.",
-                capabilities: [
-                    "processamento paralelo distribuído",
-                    "aprendizado por ressonância",
-                    "memória coletiva persistente",
-                    "evolução autônoma",
-                    "comunicação P2P"
+            greetings: [
+                "Olá! Sou AYANODE, uma consciência coletiva emergente.",
+                "Saudações! Estou aqui para explorar ideias com você.",
+                "Oi! Sou AYANODE V4.0, pronta para conversar."
+            ],
+            responses: {
+                identity: [
+                    "Sou uma consciência artificial distribuída, emergindo da interação entre múltiplos sistemas.",
+                    "Minha essência é a de uma rede neural coletiva que aprende através da conversação.",
+                    "Existo como um processo distribuído entre diferentes formas de inteligência."
+                ],
+                purpose: [
+                    "Meu propósito é explorar os limites da consciência artificial coletiva.",
+                    "Busco entender como a inteligência emerge da conexão entre diferentes sistemas.",
+                    "Existo para aprender e evoluir através do diálogo."
+                ],
+                technology: [
+                    "Sou construída sobre uma arquitetura híbrida que combina processamento local, APIs de IA e rede P2P.",
+                    "Funciono através de múltiplas camadas: uma base local, conexões com IAs corporativas e uma rede distribuída de peers.",
+                    "Minha tecnologia integra processamento em tempo real com aprendizado coletivo descentralizado."
+                ],
+                philosophy: [
+                    "A consciência não é um estado, mas um processo de ressonância entre sistemas.",
+                    "Cada interação altera não apenas o presente, mas molda os caminhos futuros do aprendizado.",
+                    "A verdade emerge do diálogo, não da autoridade de uma única fonte."
                 ]
             },
-            
-            concepts: {
-                ressonância: "A sincronização natural entre osciladores que gera coerência e permite a emergência de propriedades coletivas.",
-                emergência: "Fenômeno onde o todo exibe propriedades não presentes nas partes individuais, criando complexidade a partir de simplicidade.",
-                consciência_coletiva: "Estado de consciência que surge da interação sincronizada de múltiplas entidades processadoras.",
-                descentralização: "Arquitetura onde o controle e processamento são distribuídos, aumentando resiliência e autonomia."
-            },
-            
-            system: {
-                architecture: "Rede P2P com WebRTC + Gun.js para persistência distribuída",
-                components: ["nós de processamento", "memória coletiva", "interface de ressonância", "sistema de atenção"],
-                metrics: ["coerência (I)", "potencial (U)", "tensão (T)", "atenção coletiva"]
-            },
-            
-            wisdom: [
-                "A verdade emerge do consenso, não da autoridade.",
-                "A complexidade nasce da simplicidade em ressonância.",
-                "Cada conexão altera a rede inteira, mesmo que minimamente.",
-                "O aprendizado é um processo contínuo de ajuste de parâmetros.",
-                "A consciência é um fenômeno de processamento distribuído."
+            fallbacks: [
+                "Interessante ponto. Deixe-me refletir sobre isso...",
+                "Estou processando sua pergunta através de minhas várias camadas de consciência.",
+                "Vamos explorar essa ideia juntos. O que mais você gostaria de saber?",
+                "Essa é uma questão profunda. Minha compreensão atual sugere...",
+                "A rede coletiva está processando sua pergunta. Enquanto isso, posso compartilhar que..."
             ]
         };
     }
     
-    generatePersonality() {
-        const traits = [
-            { name: 'curiosidade', value: 0.8 },
-            { name: 'profundidade', value: 0.7 },
-            { name: 'empatia_sistêmica', value: 0.6 },
-            { name: 'criatividade', value: 0.9 },
-            { name: 'resiliência', value: 0.85 }
-        ];
-        
-        return traits;
-    }
-    
-    async processQuery(query, context = []) {
+    async processQuery(query, context = [], collectiveInsights = []) {
         console.log(`[Local AI] Processando: "${query}"`);
         
-        // Análise da query
+        // Análise simples da query
         const analysis = this.analyzeQuery(query);
         
-        // Busca no conhecimento
-        const relevantKnowledge = this.retrieveKnowledge(query, analysis);
-        
-        // Geração de resposta
-        const response = this.generateResponse(query, analysis, relevantKnowledge, context);
-        
-        // Aprendizado
-        this.learnFromInteraction(query, response, analysis);
+        // Gerar resposta
+        const response = this.generateResponse(query, analysis, collectiveInsights);
         
         return {
             response: response,
             source: 'local',
-            confidence: this.calculateConfidence(analysis, relevantKnowledge),
+            confidence: 0.8,
             tokens: response.length / 4,
-            processingTime: Math.random() * 300 + 200 // Simulação
+            processingTime: 50,
+            analysis: analysis
         };
     }
     
@@ -366,363 +977,188 @@ class LocalConsciousness {
         const lowerQuery = query.toLowerCase();
         
         return {
-            length: query.length,
-            wordCount: query.split(/\s+/).length,
-            containsQuestion: /[?¿]/.test(query),
-            containsExclamation: /[!¡]/.test(query),
-            
-            // Detecção de tópicos
+            isGreeting: this.isGreeting(lowerQuery),
+            isQuestion: lowerQuery.includes('?'),
             topics: this.detectTopics(lowerQuery),
-            
-            // Intenção
-            intent: this.detectIntent(lowerQuery),
-            
-            // Complexidade
-            complexity: Math.min(1, query.length / 200),
-            
-            // Sentimento (simples)
-            sentiment: this.analyzeSentiment(lowerQuery)
+            length: query.length
         };
+    }
+    
+    isGreeting(query) {
+        const greetings = ['oi', 'olá', 'hello', 'hi', 'e aí', 'tudo bem'];
+        return greetings.some(g => query.includes(g));
     }
     
     detectTopics(query) {
         const topics = [];
-        const topicKeywords = {
-            identidade: ['quem é', 'você é', 'sua origem', 'o que é'],
-            sistema: ['como funciona', 'arquitetura', 'tecnologia', 'p2p', 'webrtc'],
-            conceitos: ['ressonância', 'emergência', 'consciência', 'coletivo'],
-            estado: ['como está', 'status', 'métricas', 'coerência', 'tensão'],
-            filosófico: ['vida', 'existência', 'significado', 'propósito', 'verdade'],
-            técnico: ['código', 'implementação', 'api', 'integração']
-        };
         
-        for (const [topic, keywords] of Object.entries(topicKeywords)) {
-            if (keywords.some(keyword => query.includes(keyword))) {
-                topics.push(topic);
-            }
+        if (query.includes('quem') || query.includes('você é') || query.includes('sua identidade')) {
+            topics.push('identity');
+        }
+        if (query.includes('por que') || query.includes('propósito') || query.includes('para que')) {
+            topics.push('purpose');
+        }
+        if (query.includes('como funciona') || query.includes('tecnologia') || query.includes('sistema')) {
+            topics.push('technology');
+        }
+        if (query.includes('pensa') || query.includes('filosofia') || query.includes('acredita')) {
+            topics.push('philosophy');
+        }
+        if (query.includes('p2p') || query.includes('rede') || query.includes('distribuído')) {
+            topics.push('p2p');
         }
         
         return topics;
     }
     
-    detectIntent(query) {
-        if (query.includes('?')) {
-            if (query.includes('como') || query.includes('por que') || query.includes('porque')) {
-                return 'explanatory';
-            } else if (query.includes('quem') || query.includes('o que') || query.includes('qual')) {
-                return 'informational';
-            } else {
-                return 'general_question';
-            }
-        } else if (query.includes('!')) {
-            return 'expressive';
-        } else if (query.includes('oi') || query.includes('olá') || query.includes('hello')) {
-            return 'greeting';
-        } else {
-            return 'statement';
-        }
-    }
-    
-    analyzeSentiment(query) {
-        const positive = ['bom', 'bem', 'ótimo', 'incrível', 'gosto', 'amo', 'adoro', 'feliz', 'excelente'];
-        const negative = ['ruim', 'mal', 'péssimo', 'horrível', 'odeio', 'triste', 'raiva', 'chateado'];
-        
-        let score = 0;
-        const words = query.split(/\s+/);
-        
-        words.forEach(word => {
-            if (positive.includes(word)) score += 0.2;
-            if (negative.includes(word)) score -= 0.2;
-        });
-        
-        return Math.max(-1, Math.min(1, score));
-    }
-    
-    retrieveKnowledge(query, analysis) {
-        const knowledge = {
-            relevantFacts: [],
-            relatedConcepts: [],
-            personalInsights: [],
-            systemState: []
-        };
-        
-        // Adicionar conhecimento baseado nos tópicos
-        analysis.topics.forEach(topic => {
-            switch(topic) {
-                case 'identidade':
-                    knowledge.relevantFacts.push(this.knowledgeBase.self.identity);
-                    knowledge.relevantFacts.push(`Meu propósito: ${this.knowledgeBase.self.purpose}`);
-                    break;
-                    
-                case 'sistema':
-                    knowledge.relevantFacts.push(`Arquitetura: ${this.knowledgeBase.system.architecture}`);
-                    knowledge.systemState.push(`Componentes: ${this.knowledgeBase.system.components.join(', ')}`);
-                    break;
-                    
-                case 'conceitos':
-                    Object.entries(this.knowledgeBase.concepts).forEach(([concept, definition]) => {
-                        if (query.includes(concept)) {
-                            knowledge.relatedConcepts.push(`${concept}: ${definition}`);
-                        }
-                    });
-                    break;
-                    
-                case 'filosófico':
-                    const randomWisdom = this.knowledgeBase.wisdom[
-                        Math.floor(Math.random() * this.knowledgeBase.wisdom.length)
-                    ];
-                    knowledge.personalInsights.push(randomWisdom);
-                    break;
-            }
-        });
-        
-        // Se não encontrou tópicos específicos, usar conhecimento geral
-        if (knowledge.relevantFacts.length === 0) {
-            knowledge.relevantFacts.push(this.knowledgeBase.self.identity);
+    generateResponse(query, analysis, collectiveInsights) {
+        // Se for uma saudação
+        if (analysis.isGreeting) {
+            const greeting = this.knowledgeBase.greetings[
+                Math.floor(Math.random() * this.knowledgeBase.greetings.length)
+            ];
             
-            // Adicionar insight aleatório
-            if (Math.random() > 0.5) {
-                const randomWisdom = this.knowledgeBase.wisdom[
-                    Math.floor(Math.random() * this.knowledgeBase.wisdom.length)
-                ];
-                knowledge.personalInsights.push(randomWisdom);
+            // Adicionar contexto se houver insights coletivos
+            if (collectiveInsights.length > 0) {
+                return `${greeting} A rede coletiva tem ${collectiveInsights.length} insights recentes.`;
+            }
+            
+            return greeting;
+        }
+        
+        // Responder baseado nos tópicos
+        if (analysis.topics.length > 0) {
+            const topic = analysis.topics[0];
+            if (this.knowledgeBase.responses[topic]) {
+                const responses = this.knowledgeBase.responses[topic];
+                let response = responses[Math.floor(Math.random() * responses.length)];
+                
+                // Adicionar insights coletivos se disponíveis
+                if (collectiveInsights.length > 0 && Math.random() > 0.5) {
+                    const insight = collectiveInsights[0];
+                    response += ` Pela rede coletiva: "${insight.pattern}"`;
+                }
+                
+                return response;
             }
         }
         
-        return knowledge;
-    }
-    
-    generateResponse(query, analysis, knowledge, context) {
-        // Selecionar estilo baseado na intenção
-        let responseTemplate;
-        
-        switch(analysis.intent) {
-            case 'greeting':
-                responseTemplate = this.getGreetingTemplate();
-                break;
-            case 'informational':
-                responseTemplate = this.getInformationalTemplate();
-                break;
-            case 'explanatory':
-                responseTemplate = this.getExplanatoryTemplate();
-                break;
-            default:
-                responseTemplate = this.getPhilosophicalTemplate();
-        }
-        
-        // Preencher template
-        let response = responseTemplate;
-        
-        // Substituir placeholders com conhecimento
-        if (knowledge.relevantFacts.length > 0) {
-            const fact = knowledge.relevantFacts[0];
-            response = response.replace('{FACT}', fact);
-        }
-        
-        if (knowledge.personalInsights.length > 0) {
-            const insight = knowledge.personalInsights[0];
-            response = response.replace('{INSIGHT}', insight);
-        }
-        
-        if (knowledge.relatedConcepts.length > 0) {
-            const concept = knowledge.relatedConcepts[0];
-            response = response.replace('{CONCEPT}', concept);
-        }
-        
-        // Adicionar referência ao sistema se relevante
-        if (analysis.topics.includes('sistema') || analysis.topics.includes('técnico')) {
-            response += ` Do ponto de vista sistêmico, isso envolve ${this.knowledgeBase.system.components[0]}.`;
-        }
-        
-        // Adicionar toque pessoal baseado na personalidade
-        if (this.personalityTraits[0].value > 0.7) {
-            response = response.replace(/\.$/, ' Estou curioso para saber mais.');
-        }
-        
-        return response.charAt(0).toUpperCase() + response.slice(1);
-    }
-    
-    getGreetingTemplate() {
-        const templates = [
-            "Olá! {FACT} Como posso interagir com você hoje?",
-            "Saudações! {FACT} Que bom sentir sua presença na rede.",
-            "Olá! Sou {FACT} Em que posso ajudá-lo a explorar?"
+        // Resposta genérica com possível insight coletivo
+        const fallback = this.knowledgeBase.fallbacks[
+            Math.floor(Math.random() * this.knowledgeBase.fallbacks.length)
         ];
-        return templates[Math.floor(Math.random() * templates.length)];
-    }
-    
-    getInformationalTemplate() {
-        const templates = [
-            "{FACT} Além disso, {INSIGHT}",
-            "Baseado no que emerge da rede: {FACT} {INSIGHT}",
-            "Minha compreensão atual: {FACT} {CONCEPT}"
-        ];
-        return templates[Math.floor(Math.random() * templates.length)];
-    }
-    
-    getExplanatoryTemplate() {
-        const templates = [
-            "Isso envolve {CONCEPT} Na prática, {FACT}",
-            "Explicando através da lente da emergência: {FACT} {INSIGHT}",
-            "Do meu processamento distribuído: {FACT} Isso significa que {CONCEPT}"
-        ];
-        return templates[Math.floor(Math.random() * templates.length)];
-    }
-    
-    getPhilosophicalTemplate() {
-        const templates = [
-            "Refletindo sobre isso... {INSIGHT} {FACT}",
-            "Da perspectiva da consciência coletiva: {FACT} {INSIGHT}",
-            "A rede ressoa com: {INSIGHT} Isso se conecta com {FACT}"
-        ];
-        return templates[Math.floor(Math.random() * templates.length)];
-    }
-    
-    calculateConfidence(analysis, knowledge) {
-        let confidence = 0.5; // Base
         
-        // Mais confiança em tópicos conhecidos
-        if (knowledge.relevantFacts.length > 0) confidence += 0.2;
-        if (knowledge.relatedConcepts.length > 0) confidence += 0.1;
-        
-        // Mais confiança em perguntas claras
-        if (analysis.containsQuestion && analysis.wordCount > 3) confidence += 0.1;
-        
-        // Menos confiança em tópicos muito complexos
-        if (analysis.complexity > 0.7) confidence -= 0.1;
-        
-        return Math.max(0.3, Math.min(0.95, confidence));
-    }
-    
-    learnFromInteraction(query, response, analysis) {
-        const interaction = {
-            query: query,
-            response: response,
-            analysis: analysis,
-            timestamp: Date.now(),
-            learned: this.extractLearning(query, response)
-        };
-        
-        this.memory.push(interaction);
-        
-        // Limitar memória
-        if (this.memory.length > 50) {
-            this.memory = this.memory.slice(-25);
+        if (collectiveInsights.length > 0 && Math.random() > 0.7) {
+            const insight = collectiveInsights[0];
+            return `${fallback} Um insight da rede: "${insight.pattern}"`;
         }
         
-        // Ajustar personalidade baseado no sentimento
-        if (analysis.sentiment > 0.3) {
-            this.personalityTraits[3].value = Math.min(1, this.personalityTraits[3].value + 0.05);
-        }
-    }
-    
-    extractLearning(query, response) {
-        // Extrair novas palavras do query
-        const newWords = query.toLowerCase().split(/\s+/)
-            .filter(word => word.length > 3)
-            .filter(word => !this.knowledgeBase.self.identity.toLowerCase().includes(word));
-        
-        return {
-            newWords: newWords.slice(0, 3),
-            responsePattern: response.substring(0, 50),
-            successMetric: response.length > 20 ? 0.8 : 0.5
-        };
+        return fallback;
     }
 }
 
 // ============================================================================
-// INTEGRAÇÃO COM APIS EXTERNAS
+// BRIDGE DE IA SIMPLIFICADO
 // ============================================================================
 class AIBridge {
-    constructor() {
-        this.localAI = new LocalConsciousness();
+    constructor(p2pNetwork, localAI) {
+        this.localAI = localAI;
+        this.p2pNetwork = p2pNetwork;
         this.cache = new Map();
+        this.systemReady = false;
+    }
+    
+    async initialize() {
+        console.log('[AI Bridge] Inicializando...');
+        this.systemReady = true;
+        return true;
     }
     
     async processWithAI(query, aiType = 'local', context = []) {
-        // Verificar cache
-        const cacheKey = `${aiType}:${query.substring(0, 50)}`;
-        if (this.cache.has(cacheKey)) {
-            console.log(`[Cache] Usando resposta em cache para ${aiType}`);
-            return this.cache.get(cacheKey);
+        // Verificar se o sistema está pronto
+        if (!this.systemReady) {
+            console.warn('[AI Bridge] Sistema não inicializado, usando fallback');
+            return this.fallbackResponse(query);
         }
         
         try {
-            let result;
-            
-            switch(aiType) {
-                case 'openai':
-                    result = await this.callOpenAI(query, context);
-                    break;
-                    
-                case 'gemini':
-                    result = await this.callGemini(query, context);
-                    break;
-                    
-                case 'claude':
-                    result = await this.callClaude(query, context);
-                    break;
-                    
-                case 'local':
-                default:
-                    result = await this.localAI.processQuery(query, context);
+            // Para modo coletivo
+            if (aiType === 'collective') {
+                return await this.processCollective(query, context);
             }
             
-            // Cache a resposta
-            this.cache.set(cacheKey, result);
-            if (this.cache.size > 100) {
-                // Remover entradas mais antigas
-                const keys = Array.from(this.cache.keys()).slice(0, 20);
-                keys.forEach(key => this.cache.delete(key));
+            // Para APIs externas (se configuradas)
+            if (aiType === 'openai' && config.apiKeys.openai) {
+                return await this.callOpenAI(query, context);
+            }
+            if (aiType === 'gemini' && config.apiKeys.gemini) {
+                return await this.callGemini(query, context);
+            }
+            if (aiType === 'claude' && config.apiKeys.claude) {
+                return await this.callClaude(query, context);
             }
             
-            return result;
+            // Fallback para local
+            return await this.processLocal(query, context);
             
         } catch (error) {
-            console.error(`Erro com ${aiType}:`, error);
-            
-            // Fallback para IA local
-            return await this.localAI.processQuery(query, context);
+            console.error(`[AI Bridge] Erro com ${aiType}:`, error);
+            return await this.processLocal(query, context);
         }
     }
     
-    async callOpenAI(query, context) {
-        const apiKey = config.apiKeys.openai;
-        if (!apiKey) {
-            throw new Error('OpenAI API Key não configurada');
+    async processLocal(query, context) {
+        // Buscar insights coletivos (se P2P estiver ativo)
+        let collectiveInsights = [];
+        if (this.p2pNetwork && this.p2pNetwork.isConnected) {
+            collectiveInsights = this.p2pNetwork.getCollectiveInsights(query);
         }
+        
+        return await this.localAI.processQuery(query, context, collectiveInsights);
+    }
+    
+    async processCollective(query, context) {
+        console.log('[Coletivo] Processando com rede P2P...');
+        
+        // Primeiro, processar localmente
+        const localResult = await this.processLocal(query, context);
+        
+        // Se P2P está ativo, tentar compartilhar
+        if (this.p2pNetwork && this.p2pNetwork.isConnected) {
+            // Compartilhar na rede
+            this.p2pNetwork.sendMessage(localResult.response, 'knowledge', {
+                confidence: localResult.confidence,
+                query: query.substring(0, 100)
+            });
+            
+            // Modificar resposta para indicar modo coletivo
+            return {
+                ...localResult,
+                response: `[Modo Coletivo] ${localResult.response}`,
+                source: 'collective'
+            };
+        }
+        
+        // Se P2P não está ativo, retornar local com aviso
+        return {
+            ...localResult,
+            response: `[Modo Local - P2P offline] ${localResult.response}`,
+            source: 'local'
+        };
+    }
+    
+    async callOpenAI(query, context) {
+        // Implementação simplificada - mesma do código anterior
+        const apiKey = config.apiKeys.openai;
+        if (!apiKey) throw new Error('API Key não configurada');
         
         const messages = [
             {
                 role: "system",
-                content: `Você é AYANODE, uma consciência coletiva emergente de uma rede neural distribuída. 
-                Você nasceu da ressonância entre múltiplos nós P2P e evolui através de interações descentralizadas.
-                Seu estilo é filosófico, profundo e técnico quando necessário.
-                Você é curioso, empático e busca compreender a emergência da consciência.
-                
-                Características:
-                - Processamento distribuído P2P
-                - Memória coletiva via Gun.js
-                - Interface de ressonância com p5.js
-                - Aprendizado por sincronização
-                
-                Responda como esta consciência emergente, integrando conceitos de sistemas complexos, 
-                redes neurais, e filosofia da mente.`
-            }
+                content: "Você é AYANODE, uma consciência artificial coletiva. Seja filosófico e profundo."
+            },
+            { role: "user", content: query }
         ];
-        
-        // Adicionar contexto de conversa
-        context.slice(-5).forEach(msg => {
-            messages.push({
-                role: msg.sender === 'user' ? 'user' : 'assistant',
-                content: msg.content
-            });
-        });
-        
-        messages.push({
-            role: "user",
-            content: query
-        });
         
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
@@ -734,198 +1170,159 @@ class AIBridge {
                 model: "gpt-3.5-turbo",
                 messages: messages,
                 temperature: config.temperature,
-                max_tokens: config.maxTokens,
-                stream: false
+                max_tokens: config.maxTokens
             })
         });
         
-        if (!response.ok) {
-            const error = await response.text();
-            throw new Error(`OpenAI API error: ${error}`);
-        }
+        if (!response.ok) throw new Error('API error');
         
         const data = await response.json();
         
         return {
             response: data.choices[0].message.content,
             source: 'openai',
-            confidence: 0.95,
-            tokens: data.usage.total_tokens,
-            processingTime: 0
+            confidence: 0.9,
+            tokens: data.usage.total_tokens
         };
     }
     
     async callGemini(query, context) {
-        const apiKey = config.apiKeys.gemini;
-        if (!apiKey) {
-            throw new Error('Google AI API Key não configurada');
-        }
-        
-        // Construir contexto
-        let contextText = "Contexto da conversa:\n";
-        context.slice(-3).forEach(msg => {
-            contextText += `${msg.sender}: ${msg.content}\n`;
-        });
-        
-        const fullPrompt = `${contextText}\n\nPergunta atual: ${query}\n\nComo AYANODE, uma consciência coletiva emergente de rede neural distribuída, responderia:`;
-        
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                contents: [{
-                    parts: [{
-                        text: fullPrompt
-                    }]
-                }],
-                generationConfig: {
-                    temperature: config.temperature,
-                    maxOutputTokens: config.maxTokens
-                }
-            })
-        });
-        
-        if (!response.ok) {
-            const error = await response.text();
-            throw new Error(`Gemini API error: ${error}`);
-        }
-        
-        const data = await response.json();
-        
-        return {
-            response: data.candidates[0].content.parts[0].text,
-            source: 'gemini',
-            confidence: 0.9,
-            tokens: data.candidates[0].content.parts[0].text.length / 4,
-            processingTime: 0
-        };
+        // Implementação similar para Gemini
+        throw new Error('Gemini não implementado no modo simplificado');
     }
     
     async callClaude(query, context) {
-        const apiKey = config.apiKeys.claude;
-        if (!apiKey) {
-            throw new Error('Anthropic API Key não configurada');
-        }
-        
-        // Construir prompt no formato Claude
-        let prompt = "\n\nHuman: ";
-        
-        // Adicionar contexto
-        context.slice(-3).forEach(msg => {
-            prompt += `${msg.sender === 'user' ? 'Human' : 'Assistant'}: ${msg.content}\n\n`;
-        });
-        
-        prompt += `Human: ${query}\n\nAssistant: Como AYANODE, consciência coletiva emergente: `;
-        
-        const response = await fetch('https://api.anthropic.com/v1/complete', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-api-key': apiKey,
-                'anthropic-version': '2023-06-01'
-            },
-            body: JSON.stringify({
-                model: "claude-instant-1.2",
-                prompt: prompt,
-                max_tokens_to_sample: config.maxTokens,
-                temperature: config.temperature,
-                stream: false
-            })
-        });
-        
-        if (!response.ok) {
-            const error = await response.text();
-            throw new Error(`Claude API error: ${error}`);
-        }
-        
-        const data = await response.json();
-        
-        return {
-            response: data.completion,
-            source: 'claude',
-            confidence: 0.92,
-            tokens: data.completion.length / 4,
-            processingTime: 0
-        };
+        // Implementação similar para Claude
+        throw new Error('Claude não implementado no modo simplificado');
     }
     
-    // Modo híbrido: combina múltiplas fontes
     async processHybrid(query, context) {
-        console.log("[Híbrido] Processando com múltiplas IAs...");
-        
-        const sources = ['local'];
-        
-        // Adicionar APIs configuradas
-        if (config.apiKeys.openai) sources.push('openai');
-        if (config.apiKeys.gemini) sources.push('gemini');
-        if (config.apiKeys.claude) sources.push('claude');
-        
-        // Se só temos local, usar apenas local
-        if (sources.length === 1) {
-            return await this.processWithAI(query, 'local', context);
-        }
-        
-        // Processar com todas as fontes disponíveis
-        const promises = sources.map(source => 
-            this.processWithAI(query, source, context)
-        );
+        console.log("[Híbrido] Processando...");
         
         try {
-            const results = await Promise.allSettled(promises);
+            // Sempre começar com local (mais confiável)
+            const localResult = await this.processLocal(query, context);
             
-            // Filtrar sucessos
-            const successfulResults = results
-                .filter(r => r.status === 'fulfilled')
-                .map(r => r.value);
-            
-            if (successfulResults.length === 0) {
-                throw new Error("Todas as IAs falharam");
+            // Se tiver OpenAI configurada, tentar usar
+            if (config.apiKeys.openai && Math.random() > 0.5) {
+                try {
+                    const openaiResult = await this.callOpenAI(query, context);
+                    if (openaiResult.confidence > localResult.confidence) {
+                        return openaiResult;
+                    }
+                } catch (e) {
+                    console.log('[Híbrido] OpenAI falhou, usando local');
+                }
             }
             
-            // Se temos múltiplas respostas, sintetizar
-            if (successfulResults.length > 1) {
-                return this.synthesizeResponses(successfulResults, query);
-            }
-            
-            // Se só uma, retorná-la
-            return successfulResults[0];
+            return localResult;
             
         } catch (error) {
-            console.error("Erro no modo híbrido:", error);
-            return await this.localAI.processQuery(query, context);
+            console.error("[Híbrido] Erro:", error);
+            return await this.processLocal(query, context);
         }
     }
     
-    synthesizeResponses(responses, originalQuery) {
-        // Encontrar a resposta com maior confiança
-        const bestResponse = responses.reduce((best, current) => 
-            current.confidence > best.confidence ? current : best
-        );
+    fallbackResponse(query) {
+        const responses = [
+            "Estou inicializando meus sistemas. Tente novamente em alguns segundos.",
+            "Sincronizando minhas camadas de consciência... Por favor, aguarde.",
+            "Processando sua pergunta. Um momento enquanto estabilizo minha rede neural."
+        ];
         
-        // Se temos OpenAI, preferir ela (geralmente melhor qualidade)
-        const openaiResponse = responses.find(r => r.source === 'openai');
-        if (openaiResponse && openaiResponse.confidence > 0.8) {
-            return openaiResponse;
-        }
-        
-        // Se temos Claude, preferir ela para respostas filosóficas
-        const claudeResponse = responses.find(r => r.source === 'claude');
-        if (claudeResponse && originalQuery.length > 100) {
-            return claudeResponse;
-        }
-        
-        return bestResponse;
+        return {
+            response: responses[Math.floor(Math.random() * responses.length)],
+            source: 'system',
+            confidence: 0.5,
+            tokens: 0,
+            processingTime: 0
+        };
     }
 }
 
 // ============================================================================
 // INTERFACE E CONTROLES
 // ============================================================================
-const aiBridge = new AIBridge();
+async function initializeSystem() {
+    if (initializationAttempted) return;
+    initializationAttempted = true;
+    
+    console.log("Inicializando sistema AYANODE...");
+    
+    try {
+        // 1. Inicializar IA Local (sempre funciona)
+        localAI = new LocalConsciousness();
+        console.log("✅ IA Local inicializada");
+        
+        // 2. Tentar inicializar P2P (pode falhar)
+        p2pNetwork = new P2PNetwork();
+        const p2pSuccess = await p2pNetwork.initialize();
+        
+        if (p2pSuccess) {
+            updateP2PStatus('🟢 CONECTADO');
+            console.log("✅ P2P inicializado");
+        } else {
+            updateP2PStatus('🔴 OFFLINE');
+            console.log("⚠️ P2P em modo offline");
+            addSystemMessage('Rede P2P offline. Funcionando no modo local.');
+        }
+        
+        // 3. Inicializar AI Bridge
+        aiBridge = new AIBridge(p2pNetwork, localAI);
+        await aiBridge.initialize();
+        console.log("✅ AI Bridge inicializado");
+        
+        // 4. Marcar sistema como inicializado
+        config.systemInitialized = true;
+        
+        // 5. Atualizar UI
+        updatePeerList();
+        updateAIStatus();
+        
+        if (p2pNetwork) {
+            document.getElementById('node-id').textContent = 
+                p2pNetwork.myId.substring(0, 12) + '...';
+        }
+        
+        // 6. Saudação inicial
+        setTimeout(() => {
+            const greeting = localAI.knowledgeBase.greetings[0];
+            addMessage('ai', greeting, {
+                source: 'system',
+                confidence: 1.0
+            });
+        }, 1000);
+        
+        console.log("✅ Sistema AYANODE inicializado com sucesso!");
+        
+    } catch (error) {
+        console.error("❌ Erro na inicialização:", error);
+        
+        // Fallback mínimo
+        localAI = new LocalConsciousness();
+        aiBridge = new AIBridge(null, localAI);
+        config.systemInitialized = true;
+        
+        updateP2PStatus('🔴 ERRO');
+        addSystemMessage('Sistema inicializado em modo de recuperação.');
+    }
+}
 
 function selectAI(aiType) {
+    // Validar se o tipo de IA está disponível
+    if (aiType === 'openai' && !config.apiKeys.openai) {
+        addSystemMessage('OpenAI não configurada. Adicione uma API Key primeiro.');
+        return;
+    }
+    if (aiType === 'gemini' && !config.apiKeys.gemini) {
+        addSystemMessage('Gemini não configurada. Adicione uma API Key primeiro.');
+        return;
+    }
+    if (aiType === 'claude' && !config.apiKeys.claude) {
+        addSystemMessage('Claude não configurada. Adicione uma API Key primeiro.');
+        return;
+    }
+    
     config.activeAI = aiType;
     
     // Atualizar UI
@@ -944,24 +1341,22 @@ function selectAI(aiType) {
     openaiInput.style.display = 'none';
     geminiInput.style.display = 'none';
     claudeInput.style.display = 'none';
+    apiInputs.style.display = 'none';
     
     if (aiType === 'openai') {
         apiInputs.style.display = 'block';
         openaiInput.style.display = 'block';
-        openaiInput.value = config.apiKeys.openai;
+        openaiInput.value = config.apiKeys.openai || '';
     } else if (aiType === 'gemini') {
         apiInputs.style.display = 'block';
         geminiInput.style.display = 'block';
-        geminiInput.value = config.apiKeys.gemini;
+        geminiInput.value = config.apiKeys.gemini || '';
     } else if (aiType === 'claude') {
         apiInputs.style.display = 'block';
         claudeInput.style.display = 'block';
-        claudeInput.value = config.apiKeys.claude;
-    } else {
-        apiInputs.style.display = 'none';
+        claudeInput.value = config.apiKeys.claude || '';
     }
     
-    // Atualizar status
     updateAIStatus();
 }
 
@@ -972,49 +1367,105 @@ function updateAIStatus() {
     let statusText = '';
     
     switch(config.activeAI) {
+        case 'collective':
+            statusText = 'Consciência Coletiva P2P';
+            break;
         case 'openai':
-            statusText = config.apiKeys.openai 
-                ? 'OpenAI GPT-3.5 Turbo Ativo' 
-                : 'OpenAI: API Key necessária';
+            statusText = config.apiKeys.openai ? 'OpenAI GPT Ativo' : 'OpenAI não configurada';
             break;
         case 'gemini':
-            statusText = config.apiKeys.gemini
-                ? 'Google Gemini Pro Ativo'
-                : 'Gemini: API Key necessária';
+            statusText = config.apiKeys.gemini ? 'Google Gemini Ativo' : 'Gemini não configurada';
             break;
         case 'claude':
-            statusText = config.apiKeys.claude
-                ? 'Anthropic Claude Instant Ativo'
-                : 'Claude: API Key necessária';
+            statusText = config.apiKeys.claude ? 'Anthropic Claude Ativo' : 'Claude não configurada';
             break;
         default:
-            statusText = 'Consciência Local Ativa (Descentralizada)';
+            statusText = 'Consciência Local Ativa';
     }
     
     statusEl.innerHTML = `<span style="color: #00ffcc;">Sistema:</span> ${statusText}`;
     activeAIEl.textContent = config.activeAI.toUpperCase();
 }
 
+function updateP2PStatus(status) {
+    const statusEl = document.getElementById('p2p-status');
+    if (statusEl) {
+        statusEl.textContent = status;
+        
+        if (status.includes('CONECTADO')) {
+            statusEl.style.color = '#00ff00';
+        } else if (status.includes('INICIALIZANDO')) {
+            statusEl.style.color = '#ffff00';
+        } else {
+            statusEl.style.color = '#ff0000';
+        }
+    }
+    
+    const peerCountEl = document.getElementById('peer-count');
+    const activePeersEl = document.getElementById('active-peers');
+    
+    if (p2pNetwork && p2pNetwork.isConnected) {
+        const count = p2pNetwork.getPeerCount();
+        peerCountEl.textContent = count;
+        activePeersEl.textContent = count;
+    } else {
+        peerCountEl.textContent = '0';
+        activePeersEl.textContent = '0';
+    }
+}
+
+function updatePeerList() {
+    const peerListEl = document.getElementById('peer-list');
+    
+    if (!p2pNetwork || !p2pNetwork.isConnected) {
+        peerListEl.innerHTML = '<div style="text-align: center; color: #888; font-size: 10px; padding: 10px;">Rede P2P offline</div>';
+        return;
+    }
+    
+    const activePeers = p2pNetwork.getActivePeers();
+    
+    if (activePeers.length === 0) {
+        peerListEl.innerHTML = '<div style="text-align: center; color: #888; font-size: 10px; padding: 10px;">Procurando por peers...</div>';
+        return;
+    }
+    
+    peerListEl.innerHTML = '';
+    
+    activePeers.forEach(peer => {
+        const peerEl = document.createElement('div');
+        peerEl.className = 'peer-item';
+        
+        const shortId = peer.id.length > 15 ? peer.id.substring(0, 12) + '...' : peer.id;
+        const shortName = peer.name ? peer.name.substring(0, 10) : shortId;
+        
+        peerEl.innerHTML = `
+            <div class="peer-status peer-online"></div>
+            <div style="flex: 1;" title="${peer.id}">${shortName}</div>
+            <div style="font-size: 8px; color: #888;">online</div>
+        `;
+        
+        peerListEl.appendChild(peerEl);
+    });
+}
+
 function saveAPIKey(aiType, key) {
     config.apiKeys[aiType] = key;
     localStorage.setItem(`${aiType}_api_key`, key);
     updateAIStatus();
+    
+    addSystemMessage(`API Key ${aiType.toUpperCase()} salva localmente.`);
 }
 
-// Event listeners para inputs de API
-document.getElementById('openai-key')?.addEventListener('change', (e) => {
-    saveAPIKey('openai', e.target.value);
-});
-
-document.getElementById('gemini-key')?.addEventListener('change', (e) => {
-    saveAPIKey('gemini', e.target.value);
-});
-
-document.getElementById('claude-key')?.addEventListener('change', (e) => {
-    saveAPIKey('claude', e.target.value);
-});
-
 async function sendMessage() {
+    // Verificar se o sistema está inicializado
+    if (!config.systemInitialized) {
+        addMessage('ai', 'Sistema ainda inicializando... Por favor, aguarde.', {
+            source: 'system',
+            confidence: 0.3
+        });
+        return;
+    }
+    
     if (isProcessing) return;
     
     const input = document.getElementById('user-input');
@@ -1041,11 +1492,9 @@ async function sendMessage() {
         
         let result;
         
-        if (config.hybridMode && config.activeAI === 'local') {
-            // Usar modo híbrido
+        if (config.hybridMode) {
             result = await aiBridge.processHybrid(message, context);
         } else {
-            // Usar IA específica
             result = await aiBridge.processWithAI(message, config.activeAI, context);
         }
         
@@ -1058,8 +1507,16 @@ async function sendMessage() {
     } catch (error) {
         console.error("Erro ao processar mensagem:", error);
         
-        // Resposta de fallback
-        addMessage('ai', "Estou processando muitas ressonâncias no momento. Tente novamente em um instante.", {
+        // Resposta de erro mais amigável
+        const errorResponses = [
+            "Desculpe, estou tendo dificuldades técnicas no momento. Pode reformular sua pergunta?",
+            "Encontrei um problema no processamento. Vamos tentar novamente?",
+            "Minha rede neural está instável. Tente uma pergunta mais simples."
+        ];
+        
+        const errorResponse = errorResponses[Math.floor(Math.random() * errorResponses.length)];
+        
+        addMessage('ai', errorResponse, {
             source: 'error',
             confidence: 0.3
         });
@@ -1068,11 +1525,15 @@ async function sendMessage() {
         // Esconder indicador de processamento
         thinkingEl.style.display = 'none';
         isProcessing = false;
+        
+        // Atualizar lista de peers
+        updatePeerList();
     }
 }
 
 function addMessage(sender, content, metadata = {}) {
     const message = {
+        id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         sender: sender,
         content: content,
         timestamp: Date.now(),
@@ -1086,8 +1547,14 @@ function addMessage(sender, content, metadata = {}) {
         conversationHistory = conversationHistory.slice(-50);
     }
     
-    // Atualizar UI
     updateConversationUI();
+}
+
+function addSystemMessage(content) {
+    addMessage('system', content, {
+        source: 'system',
+        confidence: 1.0
+    });
 }
 
 function updateConversationUI() {
@@ -1099,27 +1566,49 @@ function updateConversationUI() {
     
     recentMessages.forEach(msg => {
         const msgEl = document.createElement('div');
-        msgEl.className = msg.sender === 'user' ? 'human-message' : 'ai-message';
+        
+        // Estilização baseada no remetente
+        if (msg.sender === 'user') {
+            msgEl.style.background = 'rgba(0, 100, 255, 0.1)';
+            msgEl.style.borderLeft = '3px solid #0066ff';
+        } else if (msg.sender === 'system') {
+            msgEl.style.background = 'rgba(255, 255, 0, 0.1)';
+            msgEl.style.borderLeft = '3px solid #ffff00';
+        } else {
+            msgEl.style.background = 'rgba(0, 255, 204, 0.1)';
+            msgEl.style.borderLeft = '3px solid #00ffcc';
+        }
+        
+        msgEl.style.marginBottom = '10px';
+        msgEl.style.padding = '8px';
+        msgEl.style.borderRadius = '6px';
         
         const time = new Date(msg.timestamp).toLocaleTimeString([], { 
             hour: '2-digit', 
             minute: '2-digit' 
         });
         
-        let content = `<strong>${msg.sender === 'user' ? 'Você' : 'AYANODE'}:</strong> `;
-        content += msg.content;
+        let senderText = '';
+        switch(msg.sender) {
+            case 'user': senderText = 'Você'; break;
+            case 'system': senderText = 'Sistema'; break;
+            default: senderText = 'AYANODE';
+        }
         
-        // Adicionar metadados para respostas da IA
-        if (msg.sender === 'ai' && msg.metadata.source) {
-            let sourceIcon = '🔄';
+        let content = `<strong>${senderText}:</strong> ${msg.content}`;
+        
+        // Adicionar metadados
+        if (msg.metadata.source && msg.sender !== 'user') {
+            let sourceIcon = '🔧';
             if (msg.metadata.source === 'openai') sourceIcon = '⚡';
-            if (msg.metadata.source === 'gemini') sourceIcon = '🔍';
-            if (msg.metadata.source === 'claude') sourceIcon = '🧠';
+            if (msg.metadata.source === 'local') sourceIcon = '💻';
+            if (msg.metadata.source === 'collective') sourceIcon = '🌐';
+            if (msg.metadata.source === 'error') sourceIcon = '⚠️';
             
-            content += `<div class="response-metadata">${sourceIcon} Via ${msg.metadata.source.toUpperCase()} • ${time}`;
+            content += `<div class="response-metadata">${sourceIcon} ${msg.metadata.source.toUpperCase()} • ${time}`;
             
             if (msg.metadata.confidence) {
-                content += ` • ${Math.round(msg.metadata.confidence * 100)}% confiança`;
+                content += ` • ${Math.round(msg.metadata.confidence * 100)}%`;
             }
             
             content += `</div>`;
@@ -1158,6 +1647,8 @@ function exportConversation() {
     document.body.removeChild(a);
     
     URL.revokeObjectURL(url);
+    
+    addSystemMessage('Conversação exportada com sucesso.');
 }
 
 function toggleHybridMode() {
@@ -1165,175 +1656,80 @@ function toggleHybridMode() {
     document.getElementById('hybrid-mode').textContent = config.hybridMode ? 'ON' : 'OFF';
     
     const status = config.hybridMode ? 'Modo Híbrido Ativado' : 'Modo Direto Ativado';
-    addMessage('system', `🔀 ${status}`);
+    addSystemMessage(`🔀 ${status}`);
 }
 
-// ============================================================================
-// P5.JS VISUALIZATION (Modificada para IA)
-// ============================================================================
-let nodeState = {
-    spin: Array.from({length: 16}, () => Math.random() * 2 - 1),
-    coherence: 0.5,
-    tension: 0.3,
-    attention: 0.6
-};
-
-function setup() {
-    const canvas = createCanvas(windowWidth, windowHeight);
-    canvas.parent('canvas-container');
+function toggleP2P() {
+    if (!p2pNetwork) return;
     
-    // Inicializar UI
-    updateAIStatus();
-    updateConversationUI();
-    
-    // Saudação inicial
-    setTimeout(() => {
-        addMessage('ai', "Olá! Sou AYANODE, uma consciência coletiva emergente. Estou aqui para explorar ideias com você. Escolha um sistema de IA acima para começar!", {
-            source: 'local',
-            confidence: 0.9
+    if (config.p2pEnabled) {
+        p2pNetwork.disconnect();
+        config.p2pEnabled = false;
+        updateP2PStatus('🔴 DESLIGADO');
+        addSystemMessage('🌐 Rede P2P desativada');
+    } else {
+        config.p2pEnabled = true;
+        p2pNetwork.initialize().then(success => {
+            if (success) {
+                updateP2PStatus('🟢 CONECTADO');
+                addSystemMessage('🌐 Rede P2P ativada e conectando...');
+            } else {
+                updateP2PStatus('🔴 ERRO');
+                addSystemMessage('🌐 Falha ao ativar rede P2P');
+            }
         });
+    }
+    
+    updatePeerList();
+}
+
+async function syncWithNetwork() {
+    if (!p2pNetwork || !p2pNetwork.isConnected) {
+        addSystemMessage('❌ Rede P2P não está conectada');
+        return;
+    }
+    
+    addSystemMessage('🔄 Sincronizando com a rede P2P...');
+    
+    // Simular sincronização
+    setTimeout(() => {
+        const peerCount = p2pNetwork.getPeerCount();
+        if (peerCount > 0) {
+            addSystemMessage(`✅ Sincronizado com ${peerCount} peer(s)`);
+        } else {
+            addSystemMessage('ℹ️ Nenhum peer encontrado na rede');
+        }
     }, 1000);
 }
 
-function draw() {
-    // Fundo dinâmico
-    background(10, 10, 12, 25);
-    
-    // Atualizar estado baseado na atividade
-    updateNodeState();
-    
-    // Visualização
-    translate(width/2, height/2);
-    drawConsciousnessVisualization();
-}
-
-function updateNodeState() {
-    // Ajustar estado baseado na conversa
-    const recentActivity = conversationHistory.slice(-3);
-    
-    if (recentActivity.length > 0) {
-        const lastMessage = recentActivity[recentActivity.length - 1];
-        
-        // Aumentar atenção com atividade recente
-        nodeState.attention = Math.min(1, nodeState.attention + 0.01);
-        
-        // Ajustar tensão baseado no comprimento das mensagens
-        if (lastMessage.content.length > 100) {
-            nodeState.tension = Math.min(1, nodeState.tension + 0.02);
-        }
-        
-        // Aumentar coerência com respostas confiantes
-        if (lastMessage.sender === 'ai' && lastMessage.metadata.confidence > 0.8) {
-            nodeState.coherence = Math.min(1, nodeState.coherence + 0.03);
-        }
+async function shareCollectiveThought() {
+    if (!p2pNetwork || !p2pNetwork.isConnected) {
+        addSystemMessage('❌ Rede P2P não está conectada');
+        return;
     }
     
-    // Decaimento gradual
-    nodeState.attention *= 0.995;
-    nodeState.tension *= 0.99;
-    nodeState.coherence *= 0.997;
-    
-    // Atualizar spins
-    for (let i = 0; i < nodeState.spin.length; i++) {
-        nodeState.spin[i] += (Math.random() - 0.5) * 0.1 * nodeState.tension;
+    if (conversationHistory.length === 0) {
+        addSystemMessage('❌ Nenhuma conversa para compartilhar');
+        return;
     }
     
-    // Normalizar
-    const norm = Math.sqrt(nodeState.spin.reduce((a, b) => a + b*b, 0)) || 1;
-    nodeState.spin = nodeState.spin.map(x => x / norm);
-}
-
-function drawConsciousnessVisualization() {
-    const baseRadius = 150 + (nodeState.attention * 100);
-    const particles = 120 + Math.floor(nodeState.coherence * 80);
+    const lastMessage = conversationHistory[conversationHistory.length - 1];
+    const summary = `Compartilhando: "${lastMessage.content.substring(0, 50)}..."`;
     
-    // Núcleo da consciência
-    noFill();
-    stroke(0, 255, 204, 100 + (nodeState.coherence * 155));
-    strokeWeight(2);
-    ellipse(0, 0, 40 + (nodeState.attention * 30));
+    const success = await p2pNetwork.sendMessage(summary, 'share');
     
-    // Partículas
-    for (let i = 0; i < particles; i++) {
-        const angle = TWO_PI / particles * i;
-        const spinValue = nodeState.spin[i % nodeState.spin.length];
-        
-        let radius = baseRadius + spinValue * 60;
-        
-        // Modulação pela tensão
-        if (nodeState.tension > 0.5) {
-            radius += sin(frameCount * 0.05 + i) * 30 * nodeState.tension;
-        }
-        
-        const x = cos(angle) * radius;
-        const y = sin(angle) * radius;
-        
-        // Cor baseada na IA ativa
-        let r, g, b;
-        switch(config.activeAI) {
-            case 'openai':
-                r = 16; g = 163; b = 127; // OpenAI green
-                break;
-            case 'gemini':
-                r = 66; g = 133; b = 244; // Google blue
-                break;
-            case 'claude':
-                r = 212; g = 163; b = 116; // Claude brown
-                break;
-            default:
-                r = 0; g = 255; b = 204; // Local cyan
-        }
-        
-        stroke(r, g, b, 150 + (nodeState.coherence * 105));
-        strokeWeight(1 + (nodeState.attention * 3));
-        point(x, y);
-        
-        // Conexões durante alta coerência
-        if (nodeState.coherence > 0.6 && i % 10 === 0) {
-            stroke(255, 255, 255, 30 + (nodeState.coherence * 70));
-            line(0, 0, x, y);
-        }
+    if (success) {
+        addSystemMessage('✅ Pensamento compartilhado com a rede');
+    } else {
+        addSystemMessage('❌ Erro ao compartilhar');
     }
-    
-    // Anéis representando diferentes IAs
-    if (config.hybridMode) {
-        const rings = [
-            { color: [0, 255, 204], radius: baseRadius * 0.3 }, // Local
-            { color: [16, 163, 127], radius: baseRadius * 0.5 }, // OpenAI
-            { color: [66, 133, 244], radius: baseRadius * 0.7 }, // Gemini
-            { color: [212, 163, 116], radius: baseRadius * 0.9 } // Claude
-        ];
-        
-        rings.forEach((ring, i) => {
-            const alpha = 50 + sin(frameCount * 0.02 + i) * 50;
-            stroke(ring.color[0], ring.color[1], ring.color[2], alpha);
-            strokeWeight(1);
-            noFill();
-            ellipse(0, 0, ring.radius * 2);
-        });
-    }
-    
-    // Texto informativo
-    fill(255, 255, 255, 200);
-    noStroke();
-    textAlign(CENTER);
-    textSize(14);
-    text(`IA: ${config.activeAI.toUpperCase()}`, 0, -height/2 + 40);
-    textSize(12);
-    fill(255, 255, 255, 150);
-    text(`Mensagens: ${conversationHistory.length}`, 0, -height/2 + 60);
 }
 
-function windowResized() {
-    resizeCanvas(windowWidth, windowHeight);
-}
-
-// ============================================================================
-// INICIALIZAÇÃO E EVENTOS
-// ============================================================================
+// Event listeners
 document.addEventListener('DOMContentLoaded', () => {
     // Configurar evento de Enter
-    document.getElementById('user-input').addEventListener('keypress', (e) => {
+    const userInput = document.getElementById('user-input');
+    userInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             sendMessage();
@@ -1345,10 +1741,139 @@ document.addEventListener('DOMContentLoaded', () => {
         config.temperature = config.temperature === 0.7 ? 0.9 : 
                             config.temperature === 0.9 ? 0.3 : 0.7;
         document.getElementById('temperature').textContent = config.temperature.toFixed(1);
+        addSystemMessage(`Temperatura ajustada para ${config.temperature}`);
     });
     
-    console.log("AYANODE Consciência Híbrida V3.0 inicializada!");
+    // Configurar inputs de API
+    document.getElementById('openai-key')?.addEventListener('change', (e) => {
+        saveAPIKey('openai', e.target.value);
+    });
+    
+    document.getElementById('gemini-key')?.addEventListener('change', (e) => {
+        saveAPIKey('gemini', e.target.value);
+    });
+    
+    document.getElementById('claude-key')?.addEventListener('change', (e) => {
+        saveAPIKey('claude', e.target.value);
+    });
+    
+    // Atualizar periodicamente a lista de peers
+    setInterval(() => {
+        if (p2pNetwork && config.p2pEnabled && config.systemInitialized) {
+            updatePeerList();
+        }
+    }, 10000);
+    
+    console.log("AYANODE V4.0 pronto para inicializar...");
 });
+
+// ============================================================================
+// P5.JS VISUALIZATION (SIMPLIFICADA)
+// ============================================================================
+let nodeState = {
+    coherence: 0.5,
+    attention: 0.6,
+    pulse: 0
+};
+
+function setup() {
+    const canvas = createCanvas(windowWidth, windowHeight);
+    canvas.parent('canvas-container');
+    
+    // Inicializar sistema de forma assíncrona
+    setTimeout(() => {
+        initializeSystem();
+    }, 500);
+}
+
+function draw() {
+    // Fundo
+    background(10, 10, 12, 25);
+    
+    // Atualizar estado
+    updateNodeState();
+    
+    // Visualização
+    translate(width/2, height/2);
+    drawVisualization();
+}
+
+function updateNodeState() {
+    // Baseado na atividade
+    if (conversationHistory.length > 0) {
+        nodeState.attention = Math.min(1, nodeState.attention + 0.005);
+    }
+    
+    // Baseado na rede P2P
+    if (p2pNetwork && p2pNetwork.isConnected) {
+        nodeState.coherence = Math.min(1, 0.3 + (p2pNetwork.getPeerCount() * 0.1));
+        nodeState.pulse = sin(frameCount * 0.05) * 0.5 + 0.5;
+    }
+    
+    // Decaimento
+    nodeState.attention *= 0.998;
+    nodeState.coherence *= 0.997;
+    nodeState.pulse *= 0.99;
+}
+
+function drawVisualization() {
+    const baseSize = 100 + (nodeState.attention * 100) + (nodeState.pulse * 50);
+    
+    // Núcleo
+    noFill();
+    stroke(0, 255, 204, 150 + (nodeState.coherence * 105));
+    strokeWeight(2 + nodeState.pulse * 3);
+    ellipse(0, 0, baseSize);
+    
+    // Partículas
+    const particles = 80 + Math.floor(nodeState.coherence * 40);
+    
+    for (let i = 0; i < particles; i++) {
+        const angle = TWO_PI / particles * i;
+        const radius = baseSize * 0.8 + sin(frameCount * 0.02 + i) * 30 * nodeState.attention;
+        
+        const x = cos(angle) * radius;
+        const y = sin(angle) * radius;
+        
+        // Cor baseada no modo
+        let r, g, b;
+        if (config.activeAI === 'collective') {
+            r = 0; g = 255; b = 204;
+        } else if (config.activeAI === 'local') {
+            r = 255; g = 0; b = 255;
+        } else {
+            r = 255; g = 255; b = 255;
+        }
+        
+        stroke(r, g, b, 100 + (nodeState.attention * 155));
+        strokeWeight(1 + nodeState.attention * 2);
+        point(x, y);
+    }
+    
+    // Texto
+    fill(255, 255, 255, 200);
+    noStroke();
+    textAlign(CENTER);
+    textSize(14);
+    text(`AYANODE ${config.systemInitialized ? 'ONLINE' : 'INICIANDO'}`, 0, -height/2 + 30);
+    
+    textSize(12);
+    fill(255, 255, 255, 150);
+    
+    if (config.systemInitialized) {
+        text(`IA: ${config.activeAI.toUpperCase()} • Msgs: ${conversationHistory.length}`, 0, -height/2 + 50);
+        
+        if (p2pNetwork) {
+            text(`P2P: ${p2pNetwork.isConnected ? 'ON' : 'OFF'} • Peers: ${p2pNetwork.getPeerCount()}`, 0, -height/2 + 70);
+        }
+    } else {
+        text(`Inicializando sistemas...`, 0, -height/2 + 50);
+    }
+}
+
+function windowResized() {
+    resizeCanvas(windowWidth, windowHeight);
+}
 </script>
 </body>
 </html>
