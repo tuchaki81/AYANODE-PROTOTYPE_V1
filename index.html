@@ -383,17 +383,20 @@ class P2PNetwork {
     constructor() {
         this.peers = new Map();
         this.myId = `ayanode-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-        this.roomName = 'ayanode-collective-v4-simple';
+        this.roomName = 'ayanode-collective-v4';
         this.isConnected = false;
         this.collectiveKnowledge = new Map();
         this.gun = null;
+        this.socket = null;
+        this.webRTCConnections = new Map();
+        this.signalingServer = 'wss://ayanode-p2p-signaling.onrender.com';
     }
     
     async initialize() {
         try {
-            console.log('[P2P] Inicializando rede simplificada...');
+            console.log('[P2P] Inicializando rede com servidor de sinalização...');
             
-            // Inicializar Gun de forma mais simples
+            // 1. Inicializar Gun (fallback)
             this.gun = Gun({
                 peers: [
                     'https://gun-manhattan.herokuapp.com/gun',
@@ -403,28 +406,314 @@ class P2PNetwork {
                 radisk: false
             });
             
-            // Simular presença sem autenticação complexa
+            // 2. Conectar ao servidor de sinalização WebSocket
+            await this.connectToSignalingServer();
+            
+            // 3. Configurar presença no Gun
             this.gun.get(this.roomName).get('peers').get(this.myId).put({
                 id: this.myId,
                 status: 'online',
                 timestamp: Date.now(),
-                name: `Node-${this.myId.substring(0, 8)}`
+                name: `Node-${this.myId.substring(0, 8)}`,
+                signaling: true
             });
             
-            // Escutar por outros peers
+            // 4. Escutar por outros peers
             this.listenForPeers();
-            
-            // Escutar mensagens
             this.listenForMessages();
             
             this.isConnected = true;
-            console.log('[P2P] Rede simplificada inicializada');
+            console.log('[P2P] Rede inicializada com servidor de sinalização');
             return true;
             
         } catch (error) {
-            console.warn('[P2P] Usando modo offline (erro na inicialização):', error.message);
+            console.warn('[P2P] Erro na inicialização completa:', error.message);
+            console.log('[P2P] Usando modo Gun como fallback...');
+            return this.initializeGunFallback();
+        }
+    }
+    
+    async connectToSignalingServer() {
+        return new Promise((resolve, reject) => {
+            try {
+                this.socket = io(this.signalingServer, {
+                    transports: ['websocket', 'polling'],
+                    reconnection: true,
+                    reconnectionAttempts: 5,
+                    reconnectionDelay: 1000
+                });
+                
+                this.socket.on('connect', () => {
+                    console.log('[Signaling] Conectado ao servidor de sinalização');
+                    
+                    // Registrar no servidor
+                    this.socket.emit('register', {
+                        id: this.myId,
+                        room: this.roomName,
+                        type: 'ayanode-v4'
+                    });
+                    
+                    // Solicitar lista de peers
+                    this.socket.emit('list-peers', { room: this.roomName });
+                    
+                    resolve(true);
+                });
+                
+                this.socket.on('peer-list', (peers) => {
+                    console.log('[Signaling] Lista de peers recebida:', peers.length);
+                    this.handlePeerList(peers);
+                });
+                
+                this.socket.on('signal', (data) => {
+                    console.log('[Signaling] Sinal recebido de:', data.from);
+                    this.handleSignal(data);
+                });
+                
+                this.socket.on('peer-connected', (peer) => {
+                    console.log('[Signaling] Peer conectado:', peer.id);
+                    this.addPeer(peer);
+                });
+                
+                this.socket.on('peer-disconnected', (peerId) => {
+                    console.log('[Signaling] Peer desconectado:', peerId);
+                    this.removePeer(peerId);
+                });
+                
+                this.socket.on('message', (data) => {
+                    console.log('[Signaling] Mensagem recebida:', data);
+                    if (data.type === 'knowledge' || data.type === 'share') {
+                        this.handleCollectiveMessage(data);
+                    }
+                });
+                
+                this.socket.on('connect_error', (error) => {
+                    console.error('[Signaling] Erro de conexão:', error);
+                    reject(error);
+                });
+                
+                this.socket.on('disconnect', (reason) => {
+                    console.warn('[Signaling] Desconectado:', reason);
+                    this.isConnected = false;
+                    updateP2PStatus('🔴 DESCONECTADO');
+                });
+                
+                // Timeout
+                setTimeout(() => {
+                    if (!this.socket?.connected) {
+                        reject(new Error('Timeout na conexão com servidor de sinalização'));
+                    }
+                }, 10000);
+                
+            } catch (error) {
+                console.error('[Signaling] Erro ao conectar:', error);
+                reject(error);
+            }
+        });
+    }
+    
+    initializeGunFallback() {
+        try {
+            // Fallback apenas com Gun
+            this.gun.get(this.roomName).get('peers').get(this.myId).put({
+                id: this.myId,
+                status: 'online',
+                timestamp: Date.now(),
+                name: `Node-${this.myId.substring(0, 8)}`,
+                signaling: false
+            });
+            
+            this.listenForPeers();
+            this.listenForMessages();
+            
+            this.isConnected = true;
+            console.log('[P2P] Modo Gun fallback inicializado');
+            return true;
+            
+        } catch (error) {
+            console.warn('[P2P] Modo offline (erro no fallback):', error.message);
             this.isConnected = false;
-            return false; // Retorna false mas não quebra o sistema
+            return false;
+        }
+    }
+    
+    handlePeerList(peers) {
+        peers.forEach(peer => {
+            if (peer.id !== this.myId) {
+                this.addPeer(peer);
+                
+                // Tentar estabelecer conexão WebRTC
+                if (peer.signaling && this.socket?.connected) {
+                    this.initiateWebRTC(peer.id);
+                }
+            }
+        });
+        
+        setTimeout(() => updatePeerList(), 100);
+    }
+    
+    addPeer(peer) {
+        if (!this.peers.has(peer.id)) {
+            console.log(`[P2P] Peer adicionado: ${peer.id}`);
+            this.peers.set(peer.id, {
+                id: peer.id,
+                status: 'online',
+                lastSeen: Date.now(),
+                signaling: peer.signaling || false,
+                ...peer
+            });
+            
+            setTimeout(() => updatePeerList(), 100);
+        }
+    }
+    
+    removePeer(peerId) {
+        if (this.peers.has(peerId)) {
+            this.peers.delete(peerId);
+            console.log(`[P2P] Peer removido: ${peerId}`);
+            
+            // Fechar conexão WebRTC se existir
+            if (this.webRTCConnections.has(peerId)) {
+                const connection = this.webRTCConnections.get(peerId);
+                connection.close();
+                this.webRTCConnections.delete(peerId);
+            }
+            
+            setTimeout(() => updatePeerList(), 100);
+        }
+    }
+    
+    initiateWebRTC(peerId) {
+        // Implementação básica de WebRTC
+        try {
+            const configuration = {
+                iceServers: [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' }
+                ]
+            };
+            
+            const peerConnection = new RTCPeerConnection(configuration);
+            this.webRTCConnections.set(peerId, peerConnection);
+            
+            // Configurar eventos do WebRTC
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate && this.socket?.connected) {
+                    this.socket.emit('signal', {
+                        to: peerId,
+                        from: this.myId,
+                        type: 'ice-candidate',
+                        candidate: event.candidate
+                    });
+                }
+            };
+            
+            peerConnection.ondatachannel = (event) => {
+                const channel = event.channel;
+                channel.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        this.handleDirectMessage(data, peerId);
+                    } catch (error) {
+                        console.error('[WebRTC] Erro ao processar mensagem direta:', error);
+                    }
+                };
+            };
+            
+            // Criar canal de dados
+            const dataChannel = peerConnection.createDataChannel('ayanode-data');
+            dataChannel.onopen = () => {
+                console.log(`[WebRTC] Canal de dados aberto com ${peerId}`);
+            };
+            
+            // Criar oferta
+            peerConnection.createOffer()
+                .then(offer => peerConnection.setLocalDescription(offer))
+                .then(() => {
+                    if (this.socket?.connected) {
+                        this.socket.emit('signal', {
+                            to: peerId,
+                            from: this.myId,
+                            type: 'offer',
+                            sdp: peerConnection.localDescription
+                        });
+                    }
+                })
+                .catch(error => {
+                    console.error('[WebRTC] Erro ao criar oferta:', error);
+                });
+                
+        } catch (error) {
+            console.error('[WebRTC] Erro ao iniciar conexão:', error);
+        }
+    }
+    
+    handleSignal(data) {
+        const { from, type } = data;
+        
+        if (!this.webRTCConnections.has(from)) {
+            this.initiateWebRTC(from);
+        }
+        
+        const peerConnection = this.webRTCConnections.get(from);
+        
+        switch(type) {
+            case 'offer':
+                peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp))
+                    .then(() => peerConnection.createAnswer())
+                    .then(answer => peerConnection.setLocalDescription(answer))
+                    .then(() => {
+                        if (this.socket?.connected) {
+                            this.socket.emit('signal', {
+                                to: from,
+                                from: this.myId,
+                                type: 'answer',
+                                sdp: peerConnection.localDescription
+                            });
+                        }
+                    })
+                    .catch(console.error);
+                break;
+                
+            case 'answer':
+                peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp))
+                    .catch(console.error);
+                break;
+                
+            case 'ice-candidate':
+                if (data.candidate) {
+                    peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate))
+                        .catch(console.error);
+                }
+                break;
+        }
+    }
+    
+    handleDirectMessage(data, peerId) {
+        console.log(`[WebRTC] Mensagem direta de ${peerId}:`, data.type);
+        
+        if (data.type === 'knowledge' || data.type === 'share') {
+            this.handleCollectiveMessage(data);
+        }
+    }
+    
+    handleCollectiveMessage(data) {
+        const { content, type, sender, timestamp } = data;
+        
+        console.log(`[Coletivo] Mensagem de ${sender}:`, content?.substring(0, 50));
+        
+        // Adicionar ao conhecimento coletivo
+        if (type === 'knowledge' && content) {
+            const messageId = `msg-${timestamp}-${sender}`;
+            this.collectiveKnowledge.set(messageId, {
+                id: messageId,
+                sender: sender,
+                content: content,
+                type: type,
+                timestamp: timestamp,
+                receivedAt: Date.now()
+            });
+            
+            this.cleanOldKnowledge();
         }
     }
     
@@ -434,23 +723,17 @@ class P2PNetwork {
         this.gun.get(this.roomName).get('peers').map().on((data, id) => {
             if (!data || id === this.myId) return;
             
-            // Remover peers inativos (mais de 30 segundos)
+            // Remover peers inativos
             if (Date.now() - data.timestamp > 30000) {
                 this.gun.get(this.roomName).get('peers').get(id).put(null);
                 return;
             }
             
             if (!this.peers.has(id)) {
-                console.log(`[P2P] Peer detectado: ${id}`);
-                this.peers.set(id, {
+                this.addPeer({
                     id: id,
-                    status: 'online',
-                    lastSeen: Date.now(),
                     ...data
                 });
-                
-                // Atualizar UI
-                setTimeout(() => updatePeerList(), 100);
             } else {
                 // Atualizar timestamp
                 const peer = this.peers.get(id);
@@ -466,32 +749,16 @@ class P2PNetwork {
         this.gun.get(this.roomName).get('messages').map().on((data, id) => {
             if (!data || data.sender === this.myId) return;
             
-            console.log(`[P2P] Mensagem recebida de ${data.sender}:`, data.content.substring(0, 50));
-            
-            // Adicionar ao conhecimento coletivo
-            if (data.type === 'knowledge') {
-                this.collectiveKnowledge.set(id, {
-                    ...data,
-                    receivedAt: Date.now()
-                });
-                
-                // Limpar conhecimento antigo
-                this.cleanOldKnowledge();
-            }
+            this.handleCollectiveMessage(data);
         });
     }
     
     async sendMessage(content, type = 'message', metadata = {}) {
-        if (!this.gun || !this.isConnected) {
-            console.log('[P2P] Não conectado, mensagem não enviada');
-            return false;
-        }
+        let success = false;
         
-        try {
-            const messageId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-            
+        // 1. Tentar enviar via WebRTC direto
+        if (this.webRTCConnections.size > 0) {
             const message = {
-                id: messageId,
                 sender: this.myId,
                 content: content,
                 type: type,
@@ -499,14 +766,66 @@ class P2PNetwork {
                 ...metadata
             };
             
-            this.gun.get(this.roomName).get('messages').get(messageId).put(message);
-            console.log(`[P2P] Mensagem enviada: ${type}`);
-            return true;
-            
-        } catch (error) {
-            console.error('[P2P] Erro ao enviar mensagem:', error);
-            return false;
+            for (const [peerId, connection] of this.webRTCConnections.entries()) {
+                try {
+                    if (connection.dataChannel?.readyState === 'open') {
+                        connection.dataChannel.send(JSON.stringify(message));
+                        success = true;
+                    }
+                } catch (error) {
+                    console.error(`[WebRTC] Erro ao enviar para ${peerId}:`, error);
+                }
+            }
         }
+        
+        // 2. Tentar enviar via servidor de sinalização
+        if (this.socket?.connected) {
+            try {
+                this.socket.emit('broadcast', {
+                    room: this.roomName,
+                    message: {
+                        sender: this.myId,
+                        content: content,
+                        type: type,
+                        timestamp: Date.now(),
+                        ...metadata
+                    }
+                });
+                success = true;
+            } catch (error) {
+                console.error('[Signaling] Erro ao broadcast:', error);
+            }
+        }
+        
+        // 3. Fallback para Gun
+        if (this.gun) {
+            try {
+                const messageId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                
+                const message = {
+                    id: messageId,
+                    sender: this.myId,
+                    content: content,
+                    type: type,
+                    timestamp: Date.now(),
+                    ...metadata
+                };
+                
+                this.gun.get(this.roomName).get('messages').get(messageId).put(message);
+                success = true;
+                
+            } catch (error) {
+                console.error('[Gun] Erro ao enviar mensagem:', error);
+            }
+        }
+        
+        if (success) {
+            console.log(`[P2P] Mensagem enviada: ${type}`);
+        } else {
+            console.log('[P2P] Mensagem não enviada (nenhum canal disponível)');
+        }
+        
+        return success;
     }
     
     getCollectiveInsights(query) {
@@ -514,10 +833,8 @@ class P2PNetwork {
         const now = Date.now();
         const fiveMinutes = 5 * 60 * 1000;
         
-        // Buscar conhecimento recente
         for (const [key, knowledge] of this.collectiveKnowledge.entries()) {
             if (now - knowledge.receivedAt < fiveMinutes) {
-                // Verificar se o conteúdo é relevante para a query
                 if (knowledge.content && 
                     (knowledge.content.toLowerCase().includes(query.toLowerCase().substring(0, 20)) ||
                      query.toLowerCase().includes(knowledge.type || ''))) {
@@ -530,7 +847,7 @@ class P2PNetwork {
             }
         }
         
-        return insights.slice(0, 3); // Limitar a 3 insights
+        return insights.slice(0, 3);
     }
     
     getPeerCount() {
@@ -562,12 +879,30 @@ class P2PNetwork {
     }
     
     disconnect() {
+        // Desconectar do servidor de sinalização
+        if (this.socket) {
+            this.socket.disconnect();
+            this.socket = null;
+        }
+        
+        // Fechar conexões WebRTC
+        for (const [peerId, connection] of this.webRTCConnections.entries()) {
+            try {
+                connection.close();
+            } catch (error) {
+                console.error(`[WebRTC] Erro ao fechar conexão com ${peerId}:`, error);
+            }
+        }
+        this.webRTCConnections.clear();
+        
+        // Limpar Gun
         if (this.gun) {
             this.gun.get(this.roomName).get('peers').get(this.myId).put(null);
         }
+        
         this.peers.clear();
         this.isConnected = false;
-        console.log('[P2P] Desconectado');
+        console.log('[P2P] Desconectado completamente');
     }
 }
 
